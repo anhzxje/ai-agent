@@ -38,21 +38,27 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return true;
+        return true; // Tài khoản không có thời hạn hết hạn
     }
 
+    /**
+     * Kiểm tra tài khoản có bị khóa hay không (dựa trên trường isLocked trong MySQL).
+     */
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return !Boolean.TRUE.equals(user.getIsLocked());
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
+        return true; // Thông tin đăng nhập không hết hạn
     }
 
+    /**
+     * Tài khoản được phép hoạt động khi không ở trạng thái bị khóa.
+     */
     @Override
     public boolean isEnabled() {
-        return true;
+        return !Boolean.TRUE.equals(user.getIsLocked());
     }
 }

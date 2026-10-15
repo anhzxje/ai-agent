@@ -16,6 +16,10 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
+/**
+ * Kiểm thử Dịch vụ Tải Chi tiết Người dùng Spring Security (CustomUserDetailsServiceTest):
+ * Kiểm tra việc chuyển đổi User entity sang UserDetails và xử lý ngoại lệ UsernameNotFoundException khi không tồn tại.
+ */
 @ExtendWith(MockitoExtension.class)
 class CustomUserDetailsServiceTest {
 

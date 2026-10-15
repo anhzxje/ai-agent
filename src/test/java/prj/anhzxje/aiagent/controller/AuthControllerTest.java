@@ -26,6 +26,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * Kiểm thử Đơn vị cho Phân hệ Xác thực (AuthControllerTest):
+ * Kiểm tra các kịch bản:
+ * 1. Đăng ký tài khoản thành công và sinh JWT token.
+ * 2. Đăng ký trùng lặp username hoặc email (trả về lỗi HTTP 400).
+ * 3. Đăng nhập thành công với thông tin chính xác.
+ * 4. Đăng nhập thất bại do sai mật khẩu (BadCredentialsException -> HTTP 401).
+ * 5. Đăng nhập thất bại do tài khoản bị khóa (isLocked=true -> HTTP 403).
+ */
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
 

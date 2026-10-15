@@ -23,6 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * Kiểm thử Bộ Thực thi Tác vụ Ngầm (AgentTaskExecutorTest):
+ * Kiểm tra:
+ * 1. Cơ chế thực thi bất đồng bộ trên luồng riêng.
+ * 2. Cập nhật trạng thái PENDING -> PROCESSING -> COMPLETED/ERROR.
+ * 3. Kiểm tra tính năng Sandbox an toàn (chặn đường dẫn không nằm trong allowed-paths).
+ */
 @ExtendWith(MockitoExtension.class)
 class AgentTaskExecutorTest {
 

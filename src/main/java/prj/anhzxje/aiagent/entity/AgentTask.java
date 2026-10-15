@@ -9,6 +9,14 @@ import prj.anhzxje.aiagent.enums.TaskType;
 
 import java.time.LocalDateTime;
 
+/**
+ * Thực thể Tác vụ AI Agent (Agent Task):
+ * Lưu trữ tiến trình thực thi tác vụ phân tích mã nguồn giữa User, Project và LLM:
+ * - Trạng thái vòng đời: PENDING -> PROCESSING -> COMPLETED / ERROR / CANCELLED
+ * - Input JSON: Tham số cấu hình tác vụ (projectPath, model, focus, selectedTools, prompt)
+ * - Output JSON: Báo cáo đánh giá trả về từ AI Agent (summary, issues, suggestions)
+ * - isPinned: Ghim tác vụ quan trọng lên thanh điều hướng bên trái
+ */
 @Entity
 @Table(name = "agent_tasks")
 @Getter
@@ -77,4 +85,8 @@ public class AgentTask {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime completedAt;
+
+    @Column(name = "is_pinned")
+    @Builder.Default
+    private Boolean isPinned = false;
 }

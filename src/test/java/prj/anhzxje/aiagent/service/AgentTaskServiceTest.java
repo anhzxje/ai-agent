@@ -29,6 +29,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * Kiểm thử Đơn vị cho Tầng Dịch vụ Tác vụ (AgentTaskServiceTest):
+ * Kiểm tra các nghiệp vụ cơ bản:
+ * 1. Khởi tạo tác vụ mới và xác thực quyền sở hữu project.
+ * 2. Lấy chi tiết tác vụ, danh sách tác vụ theo người dùng hoặc dự án.
+ * 3. Ghim / Bỏ ghim tác vụ lên dashboard.
+ */
 @ExtendWith(MockitoExtension.class)
 class AgentTaskServiceTest {
 
@@ -133,7 +140,7 @@ class AgentTaskServiceTest {
 
     @Test
     void testGetMyTasks() {
-        when(agentTaskRepository.findByUserId(1L)).thenReturn(List.of(sampleTask));
+        when(agentTaskRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(sampleTask));
 
         List<AgentTaskResponse> tasks = agentTaskService.getMyTasks();
 

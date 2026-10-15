@@ -1,39 +1,53 @@
+# ==============================================================================
+# CẤU HÌNH HỆ THỐNG SOOPI AI AGENT PLATFORM (application.yml)
+# ==============================================================================
+
 spring:
   application:
     name: aiagent
 
+  # 1. Cấu hình Kết nối Cơ sở dữ liệu MySQL
   datasource:
-    url: "jdbc:mysql://localhost:3306/ai_agent"
+    url: "jdbc:mysql://localhost:3306/ai_agent?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  # 2. Cấu hình JPA & Hibernate ORM
   jpa:
-    open-in-view: false
+    open-in-view: false # Tắt Open Session in View để tối ưu tài nguyên kết nối
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: update # Tự động tạo và cập nhật schema CSDL từ entity Java
+    show-sql: true     # Hiển thị câu lệnh SQL ra console log để dễ theo dõi
     properties:
       hibernate:
-        format_sql: true
+        format_sql: true # Định dạng câu lệnh SQL đẹp mắt trong console
 
+  # 3. Cấu hình Spring AI & Google Gemini LLM
   ai:
     google:
       genai:
-        api-key: ${GOOGLE_API_KEY}
+        # API Key của Google Gemini: Tự động nạp từ biến môi trường GOOGLE_API_KEY nếu có
+        # Giữ placeholder này để an toàn tuyệt đối khi push code lên Git/GitHub
+        api-key: ${GOOGLE_API_KEY:AIzaSyPlaceholderKeyForInit}
         chat:
           options:
+            # Model mặc định: gemini-3.5-flash-lite (Hạn mức 500 RPD, siêu nhanh & tối ưu phản hồi)
             model: gemini-3.5-flash-lite
 
+# 4. Cấu hình Cổng Web Server
 server:
-  port: 8080
+  port: 8081
 
+# 5. Cấu hình Chuẩn bảo mật JSON Web Token (JWT)
 jwt:
+  # Khóa bí mật HMAC-SHA256 (tối thiểu 256 bits) để mã hóa và kiểm tra chữ ký token
   secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-  expiration: 86400000 # 24 hours
+  # Thời hạn sống của JWT Token: 86.400.000 ms = 24 giờ
+  expiration: 86400000
 
-# Danh sách thư mục mà AI Agent được phép truy cập (chống Path Traversal).
-# Nếu để trống → cho phép tất cả (chỉ dùng cho dev, KHÔNG dùng production).
+# 6. Cơ chế Bảo mật Sandbox cho AI Agent (Chống tấn công Path Traversal)
+# AI Agent chỉ được phép đọc/duyệt mã nguồn trong các thư mục nằm trong danh sách này.
 agent:
   allowed-paths:
     - ${AGENT_ALLOWED_PATH:D:/AI Agent}

@@ -31,3 +31,13 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Desktop App ###
+desktop/node_modules/
+desktop/dist/
+
+### Secrets & Local Environment ###
+.env
+.env.*
+application-local.yml
+application-local.properties

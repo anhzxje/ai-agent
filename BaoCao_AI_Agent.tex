@@ -1,4 +1,4 @@
-% !TEX root = ./BaoCao_AI_Agent_Platform.tex
+% !TEX root = ./BaoCao_AI_Agent.tex
 % !TEX program = pdflatex
 % !TEX encoding = UTF-8
 
@@ -70,7 +70,7 @@
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{} 
-\lhead{Báo cáo: Nghiên cứu và xây dựng AI Agent hỗ trợ Code Review sử dụng Spring AI} 
+\lhead{Báo cáo: Nghiên cứu và xây dựng hệ thống AI Agent hỗ trợ phát triển phần mềm sử dụng Spring AI} 
 \rfoot{\thepage} 
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0pt}
@@ -158,7 +158,7 @@
     {\fontsize{14pt}{17pt}\selectfont \bfseries \raggedright Chủ đề:\par}
     \vspace{0.25cm}
     
-    {\fontsize{18pt}{22pt}\selectfont \bfseries NGHIÊN CỨU VÀ XÂY DỰNG AI AGENT HỖ TRỢ CODE REVIEW SỬ DỤNG SPRING AI\par}
+    {\fontsize{18pt}{22pt}\selectfont \bfseries NGHIÊN CỨU VÀ XÂY DỰNG HỆ THỐNG AI AGENT HỖ TRỢ PHÁT TRIỂN PHẦN MỀM SỬ DỤNG SPRING AI\par}
     
     \vfill
     
@@ -194,19 +194,19 @@
 \chapter*{Lời mở đầu}
 \addcontentsline{toc}{chapter}{Lời mở đầu}
 
-Trong quy trình phát triển phần mềm hiện đại, việc đảm bảo chất lượng, tính ổn định và mức độ an toàn bảo mật của mã nguồn luôn là một trong những ưu tiên hàng đầu của các tổ chức công nghệ. Hoạt động đánh giá mã nguồn (Code Review) đóng vai trò như một mắt xích kiểm thử then chốt trước khi mã nguồn được tích hợp vào nhánh chính và đưa lên môi trường vận hành. Tuy nhiên, phương pháp đánh giá thủ công truyền thống do các kỹ sư phần mềm đảm nhiệm thường đòi hỏi nhiều thời gian, tạo điểm nghẽn trong tiến độ phát hành tính năng và phụ thuộc lớn vào sự tập trung cũng như kinh nghiệm cá nhân của người đánh giá.
+Trong quy trình phát triển phần mềm hiện đại, việc đảm bảo chất lượng, tính ổn định và mức độ an toàn bảo mật của mã nguồn luôn là một trong những ưu tiên hàng đầu của các tổ chức công nghệ. Trong toàn bộ chu trình phát triển phần mềm (Software Development Life Cycle - SDLC), các kỹ sư phần mềm phải thực hiện nhiều hoạt động kỹ thuật chuyên sâu như rà soát và đánh giá mã nguồn (Code Review), phân tích kiến trúc hệ thống, phát hiện sớm các lỗ hổng bảo mật và tối ưu hóa hiệu năng thực thi. Tuy nhiên, các phương pháp thủ công truyền thống thường đòi hỏi nhiều thời gian, tạo điểm nghẽn trong tiến độ phát hành tính năng và phụ thuộc lớn vào kinh nghiệm cá nhân của từng lập trình viên.
 
-Sự phát triển mạnh mẽ của Trí tuệ nhân tạo, đặc biệt là các mô hình ngôn ngữ lớn kết hợp cùng kiến trúc tác tử (AI Agent) và cơ chế gọi công cụ (Tool Calling), đã mở ra hướng tiếp cận mới trong việc tự động hóa quá trình phân tích mã nguồn. Khác với các công cụ phân tích tĩnh truyền thống chỉ kiểm tra theo tập quy tắc cố định, tác tử AI có khả năng chủ động điều hướng, khám phá cấu trúc thư mục dự án và đưa ra lời giải thích cùng các khuyến nghị khắc phục bằng ngôn ngữ tự nhiên.
+Sự phát triển mạnh mẽ của Trí tuệ nhân tạo, đặc biệt là các mô hình ngôn ngữ lớn kết hợp cùng kiến trúc tác tử (AI Agent) và cơ chế gọi công cụ (Tool Calling), đã mở ra hướng tiếp cận đột phá trong việc tự động hóa và hỗ trợ các công việc kỹ thuật phần mềm. Khác với các công cụ phân tích tĩnh truyền thống chỉ kiểm tra theo tập quy tắc cố định, tác tử AI có khả năng chủ động điều hướng, tự khám phá cấu trúc thư mục dự án, lập luận theo ngữ cảnh và đưa ra lời giải thích cùng các khuyến nghị khắc phục chuẩn xác bằng ngôn ngữ tự nhiên.
 
-Xuất phát từ yêu cầu thực tiễn trong đợt thực tập tốt nghiệp, em đã thực hiện đề tài: \textbf{``Nghiên cứu và xây dựng AI Agent hỗ trợ Code Review sử dụng Spring AI''}. Báo cáo này tổng hợp quá trình tìm hiểu lý thuyết, phân tích thiết kế và hiện thực hóa một hệ thống dịch vụ backend trên nền tảng Spring Boot và Java 21, tích hợp thư viện Spring AI để điều khiển mô hình Google Gemini thực thi phân tích mã nguồn, kết hợp cơ chế xử lý bất đồng bộ, các giải pháp bảo mật đa lớp và kiểm thử tự động đo lường độ phủ với JaCoCo.
+Xuất phát từ yêu cầu thực tiễn trong đợt thực tập tốt nghiệp, em đã thực hiện đề tài: \textbf{``Nghiên cứu và xây dựng hệ thống AI Agent hỗ trợ phát triển phần mềm sử dụng Spring AI''}. Báo cáo này tổng hợp quá trình tìm hiểu lý thuyết, phân tích thiết kế và hiện thực hóa một hệ thống nền tảng backend trên nền tảng Spring Boot và Java 21, tích hợp thư viện Spring AI để điều khiển mô hình Google Gemini thực thi các tác vụ hỗ trợ phát triển phần mềm (trong đó module đánh giá mã nguồn chuyên sâu được triển khai hoàn chỉnh làm trọng tâm thực nghiệm), kết hợp cơ chế xử lý bất đồng bộ, các giải pháp bảo mật đa lớp và kiểm thử tự động đo lường độ phủ với JaCoCo.
 
 Bố cục của báo cáo được tổ chức thành 5 chương chính:
 \begin{itemize}
-    \item \textbf{Chương 1: Giới thiệu bài toán và cơ sở công nghệ} -- Trình bày bối cảnh, thách thức của bài toán đánh giá mã nguồn, so sánh các phương pháp tiếp cận và cơ sở lý thuyết về AI Agent, Spring AI.
-    \item \textbf{Chương 2: Phân tích và thiết kế hệ thống} -- Đặc tả các yêu cầu chức năng, phi chức năng, ma trận phân quyền RBAC, sơ đồ kiến trúc phân tầng, cơ sở dữ liệu, luồng xử lý bất đồng bộ và thiết kế RESTful API.
+    \item \textbf{Chương 1: Giới thiệu bài toán và cơ sở công nghệ} -- Trình bày bối cảnh, thách thức trong quy trình phát triển phần mềm, so sánh các phương pháp hỗ trợ kỹ thuật và cơ sở lý thuyết về AI Agent, Spring AI.
+    \item \textbf{Chương 2: Phân tích và thiết kế hệ thống} -- Đặc tả các yêu cầu chức năng, phi chức năng, ma trận phân quyền RBAC, sơ đồ kiến trúc phân tầng, cơ sở dữ liệu hỗ trợ đa dạng tác vụ và thiết kế RESTful API.
     \item \textbf{Chương 3: Quá trình triển khai và hiện thực hóa hệ thống} -- Trình bày chi tiết việc cài đặt tác tử AI, kỹ thuật thiết kế lời nhắc hệ thống, quản lý luồng bất đồng bộ \texttt{ThreadPoolTaskExecutor}, bảo mật phòng vệ hệ thống tệp và đóng gói Docker.
     \item \textbf{Chương 4: Kết quả thử nghiệm và đánh giá hệ thống} -- Tổng kết kết quả kiểm thử chức năng qua Postman, số liệu đo độ phủ kiểm thử tự động qua JaCoCo, thực nghiệm trên các dự án mẫu và phân tích sự cố kỹ thuật.
-    \item \textbf{Chương 5: Kết luận và hướng phát triển} -- Đánh giá tổng thể các kết quả đạt được, giá trị thực tiễn, bài học kinh nghiệm và các định hướng mở rộng trong tương lai.
+    \item \textbf{Chương 5: Kết luận và hướng phát triển} -- Đánh giá tổng thể các kết quả đạt được, giá trị thực tiễn trong chu trình phát triển phần mềm, bài học kinh nghiệm và các định hướng mở rộng đa tác tử trong tương lai.
 \end{itemize}
 
 Em xin bày tỏ lòng biết ơn sâu sắc tới các thầy cô giáo tại Trường Đại học Khoa học Tự nhiên, Đại học Quốc gia Hà Nội đã tận tình truyền đạt những kiến thức chuyên môn quý báu trong suốt quá trình học tập. Em cũng xin chân thành cảm ơn Ban lãnh đạo đơn vị thực tập cùng Cán bộ hướng dẫn tại doanh nghiệp đã tận tâm chỉ bảo, định hướng và tạo mọi điều kiện thuận lợi để em hoàn thành đợt thực tập và xây dựng báo cáo này.
@@ -263,37 +263,38 @@ SSE & Server-Sent Events -- Cơ chế truyền dữ liệu một chiều từ m�
 
 \section{Bối cảnh và phát biểu bài toán}
 \subsection{Bối cảnh thực tế trong quy trình phát triển phần mềm}
-Trong các quy trình phát triển phần mềm hiện đại, đánh giá mã nguồn là bước kiểm thử tĩnh quan trọng nhằm rà soát chất lượng, tính ổn định và mức độ an toàn của sản phẩm trước khi mã nguồn được tích hợp vào nhánh chính và đưa lên môi trường vận hành.
+Trong các quy trình phát triển phần mềm hiện đại (Agile, DevOps), việc duy trì tốc độ phát triển đi đôi với kiểm soát chất lượng mã nguồn, độ tin cậy và an toàn bảo mật là bài toán trọng tâm của các đội ngũ kỹ thuật. Các tác vụ kỹ thuật phần mềm như phân tích mã nguồn, đánh giá mã (Code Review), kiểm tra cấu trúc thiết kế, rà soát lỗ hổng bảo mật và tối ưu truy vấn đóng vai trò then chốt trước khi sản phẩm được tích hợp và đưa lên môi trường vận hành.
 
 Quá trình này giúp:
 \begin{itemize}
-    \item Phát hiện sớm các lỗi sai trong logic nghiệp vụ, vi phạm cấu trúc thiết kế hoặc các đoạn mã dư thừa.
-    \item Hạn chế các nguy cơ bảo mật như để lộ khóa bí mật trong mã nguồn, thiếu kiểm tra quyền truy cập tài nguyên.
-    \item Duy trì tính nhất quán về phong cách lập trình, tạo thuận lợi cho việc đọc hiểu và bảo trì dự án.
+    \item Phát hiện sớm các lỗi sai trong logic nghiệp vụ, vi phạm cấu trúc thiết kế kiến trúc hoặc các đoạn mã dư thừa, gây tắc nghẽn hiệu năng.
+    \item Hạn chế các nguy cơ bảo mật nghiêm trọng như để lộ khóa bí mật trong mã nguồn, thiếu kiểm tra phân quyền truy cập tài nguyên (IDOR).
+    \item Duy trì tính nhất quán về phong cách lập trình và chuẩn thiết kế, tạo thuận lợi cho việc đọc hiểu, bảo trì và mở rộng hệ thống.
 \end{itemize}
 
 \subsection{Phát biểu bài toán và những thách thức cốt lõi}
-Trong thực tế phát triển phần mềm, phương pháp đánh giá mã nguồn thủ công do lập trình viên đảm nhiệm thường gặp một số khó khăn:
+Trong thực tế phát triển phần mềm, các phương pháp hỗ trợ lập trình viên truyền thống thường gặp một số rào cản lớn:
 \begin{enumerate}
-    \item \textbf{Độ trễ thời gian}: Việc đọc hiểu từng dòng thay đổi trên các yêu cầu gộp mã (Pull Request) đòi hỏi nhiều thời gian, dễ gây chậm tiến độ tích hợp tính năng mới.
-    \item \textbf{Tính phụ thuộc vào người đánh giá}: Kết quả rà soát phụ thuộc vào kinh nghiệm, sự tập trung và kiến thức bảo mật của từng cá nhân. Một số vấn đề logic hoặc hiệu năng truy vấn cơ sở dữ liệu có thể bị bỏ sót.
-    \item \textbf{Khả năng mở rộng}: Khi số lượng lập trình viên và khối lượng mã nguồn tăng lên, việc bố trí nhân sự rà soát thủ công toàn bộ mã nguồn làm gia tăng chi phí vận hành của nhóm phát triển.
+    \item \textbf{Độ trễ thời gian và điểm nghẽn quy trình}: Việc rà soát thủ công từng dòng thay đổi trên các yêu cầu gộp mã (Pull Request) đòi hỏi nhiều thời gian, dễ gây chậm tiến độ phát hành tính năng mới.
+    \item \textbf{Tính phụ thuộc vào người đánh giá}: Kết quả rà soát phụ thuộc nhiều vào kinh nghiệm, sự tập trung và kiến thức bảo mật của từng cá nhân. Một số vấn đề logic phức tạp hoặc hiệu năng truy vấn cơ sở dữ liệu tiềm ẩn có thể bị bỏ sót.
+    \item \textbf{Hạn chế của các công cụ phân tích tĩnh truyền thống}: Các bộ quét tĩnh (Static Analysis) thường đưa ra kết quả khô cứng dựa trên tập luật cứng nhắc, thiếu khả năng hiểu ngữ cảnh tổng thể của dự án và không cung cấp giải thích hay khuyến nghị chi tiết bằng ngôn ngữ tự nhiên.
+    \item \textbf{Khả năng mở rộng chi phí}: Khi quy mô dự án và số lượng kỹ sư tăng lên, việc phân bổ nguồn lực rà soát và kiểm thử thủ công làm gia tăng đáng kể chi phí vận hành.
 \end{enumerate}
 
-Từ thực tế trên, việc nghiên cứu xây dựng giải pháp hỗ trợ đánh giá mã nguồn tự động dựa trên trí tuệ nhân tạo có khả năng thu thập ngữ cảnh dự án và hỗ trợ lập trình viên sơ lọc các vấn đề kỹ thuật là một hướng tiếp cận có giá trị thực tiễn.
+Từ thực tế trên, việc nghiên cứu xây dựng một hệ thống AI Agent hỗ trợ phát triển phần mềm thông minh có khả năng tự động khám phá cấu trúc mã nguồn, phân tích ngữ cảnh dự án và đồng hành cùng lập trình viên là một hướng đi có giá trị thực tiễn cao.
 
 \section{Mục tiêu và phạm vi đề tài trong đợt thực tập}
 Đề tài tập trung vào các mục tiêu sau:
 \begin{itemize}
-    \item \textbf{Về nghiên cứu lý thuyết}: Tìm hiểu nguyên lý hoạt động của kiến trúc tác tử AI, mô hình suy luận ReAct và cơ chế gọi công cụ của các mô hình ngôn ngữ lớn.
-    \item \textbf{Về xây dựng hệ thống}:
+    \item \textbf{Về nghiên cứu lý thuyết}: Tìm hiểu nguyên lý hoạt động của kiến trúc tác tử AI (AI Agent), mô hình suy luận nhiều bước ReAct và cơ chế gọi công cụ (Tool Calling) của các mô hình ngôn ngữ lớn hiện đại.
+    \item \textbf{Về xây dựng hệ thống nền tảng}:
     \begin{itemize}
-        \item Xây dựng hệ thống backend trên nền tảng Spring Boot và Java 21 theo kiến trúc phân tầng (Controller, Service, Repository, DTO).
-        \item Sử dụng thư viện Spring AI kết nối với mô hình Google Gemini để thực hiện phân tích mã nguồn theo các định hướng: bảo mật, hiệu năng, lỗi logic và chuẩn mã nguồn.
-        \item Cài đặt cơ chế xử lý bất đồng bộ với \texttt{ThreadPoolTaskExecutor}, cho phép tác vụ phân tích chạy ở luồng nền để không làm gián đoạn phản hồi của API.
-        \item Thiết lập các cơ chế kiểm soát an toàn: xác thực JWT, kiểm tra quyền sở hữu tài nguyên nhằm hạn chế IDOR và chuẩn hóa đường dẫn nhằm ngăn ngừa tấn công duyệt thư mục trái phép (Path Traversal).
+        \item Xây dựng hệ thống backend hoàn chỉnh trên nền tảng Spring Boot và Java 21 theo kiến trúc phân tầng (Controller, Service, Repository, DTO), hỗ trợ đa dạng các loại tác vụ kỹ thuật phần mềm (\texttt{CODE\_REVIEW}, \texttt{CODE\_FIX}, \texttt{CODE\_EXPLAIN}, \texttt{TEST\_GENERATION}).
+        \item Sử dụng thư viện Spring AI kết nối với mô hình Google Gemini để hiện thực hóa tác tử AI phân tích mã nguồn chuyên sâu theo 4 khía cạnh trọng tâm: bảo mật (\texttt{SECURITY}), hiệu năng (\texttt{PERFORMANCE}), lỗi logic (\texttt{BUG}) và chuẩn mã nguồn (\texttt{CODE\_QUALITY}).
+        \item Cài đặt cơ chế xử lý bất đồng bộ với \texttt{ThreadPoolTaskExecutor}, cho phép tác vụ phân tích chạy ở luồng nền để không làm gián đoạn phản hồi của các điểm cuối REST API.
+        \item Thiết lập các cơ chế kiểm soát an toàn đa lớp: xác thực JWT, kiểm tra quyền sở hữu tài nguyên nhằm hạn chế IDOR và chuẩn hóa đường dẫn nhằm ngăn ngừa tấn công duyệt thư mục trái phép (Path Traversal).
     \end{itemize}
-    \item \textbf{Về kiểm thử và đóng gói}: Xây dựng bộ kiểm thử tự động đo độ phủ mã nguồn với JaCoCo và cấu hình đóng gói triển khai ứng dụng cùng cơ sở dữ liệu MySQL bằng Docker Compose.
+    \item \textbf{Về kiểm thử và đóng gói}: Xây dựng bộ kiểm thử tự động đo độ phủ mã nguồn với JaCoCo và cấu hình đóng gói triển khai toàn diện hệ thống cùng cơ sở dữ liệu MySQL bằng Docker Compose.
 \end{itemize}
 
 \section{Tổng quan và so sánh các phương pháp đánh giá mã nguồn}
@@ -358,7 +359,7 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái dựa trên 
 \section{Phân tích yêu cầu hệ thống}
 
 \subsection{Yêu cầu chức năng}
-Hệ thống được thiết kế đáp ứng 4 nhóm yêu cầu chức năng chính:
+Hệ thống được thiết kế đáp ứng 4 nhóm yêu cầu chức năng chính phục vụ hỗ trợ phát triển phần mềm:
 \begin{enumerate}
     \item \textbf{Phân hệ xác thực và quản lý tài khoản}:
     \begin{itemize}
@@ -367,18 +368,19 @@ Hệ thống được thiết kế đáp ứng 4 nhóm yêu cầu chức năng c
     \end{itemize}
     \item \textbf{Phân hệ quản lý dự án mã nguồn}:
     \begin{itemize}
-        \item Khai báo thông tin dự án kèm đường dẫn thư mục mã nguồn trên máy chủ.
+        \item Khai báo thông tin dự án kèm ngôn ngữ lập trình và đường dẫn thư mục mã nguồn trên máy chủ.
         \item Tra cứu, cập nhật thông tin và xóa dự án thuộc quyền sở hữu của người dùng.
     \end{itemize}
-    \item \textbf{Phân hệ điều phối và đánh giá mã nguồn}:
+    \item \textbf{Phân hệ điều phối tác vụ AI hỗ trợ phát triển phần mềm}:
     \begin{itemize}
-        \item Khởi tạo tác vụ phân tích theo các chế độ: \texttt{SECURITY} (bảo mật), \texttt{PERFORMANCE} (hiệu năng), \texttt{BUG} (lỗi logic), \texttt{CODE\_QUALITY} (chuẩn mã nguồn) hoặc phân tích tổng hợp.
-        \item Tác tử AI tự động thực hiện chu trình khám phá cây thư mục, tìm kiếm và đọc các tệp tin cần thiết.
+        \item Tiếp nhận và phân luồng các loại tác vụ kỹ thuật theo \texttt{TaskType} (\texttt{CODE\_REVIEW}, \texttt{CODE\_FIX}, \texttt{CODE\_EXPLAIN}, \texttt{TEST\_GENERATION}).
+        \item Khởi tạo tác vụ phân tích mã nguồn chuyên sâu theo các trọng tâm kỹ thuật: \texttt{SECURITY} (bảo mật), \texttt{PERFORMANCE} (hiệu năng), \texttt{BUG} (lỗi logic), \texttt{CODE\_QUALITY} (chuẩn mã nguồn) hoặc phân tích tổng hợp.
+        \item Tác tử AI tự động thực hiện chu trình khám phá cây thư mục, tìm kiếm tệp và đọc các tệp tin mã nguồn cần thiết thông qua bộ công cụ Tool Calling.
     \end{itemize}
     \item \textbf{Phân hệ tra cứu và quản lý báo cáo}:
     \begin{itemize}
-        \item Theo dõi trạng thái thực thi của tác vụ (\texttt{PENDING}, \texttt{PROCESSING}, \texttt{COMPLETED}, \texttt{ERROR}).
-        \item Truy vấn kết quả đánh giá chi tiết dưới định dạng JSON có cấu trúc.
+        \item Theo dõi trạng thái thực thi của tác vụ theo thời gian thực (\texttt{PENDING}, \texttt{PROCESSING}, \texttt{COMPLETED}, \texttt{ERROR}).
+        \item Truy vấn kết quả phân tích chi tiết dưới định dạng JSON có cấu trúc linh hoạt.
     \end{itemize}
 \end{enumerate}
 
@@ -970,11 +972,11 @@ Trong quá trình phát triển và thử nghiệm hệ thống, một số vấ
 \chapter{KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN}
 
 \section{Tổng kết các kết quả đạt được}
-Trong khuôn khổ đợt thực tập tốt nghiệp, đề tài ``Nghiên cứu và xây dựng AI Agent hỗ trợ Code Review sử dụng Spring AI'' đã hoàn thành các mục tiêu kỹ thuật đề ra:
+Trong khuôn khổ đợt thực tập tốt nghiệp, đề tài \textbf{``Nghiên cứu và xây dựng hệ thống AI Agent hỗ trợ phát triển phần mềm sử dụng Spring AI''} đã hoàn thành toàn diện các mục tiêu kỹ thuật đề ra:
 
 \subsection{Về mặt nghiên cứu và tiếp cận công nghệ}
 \begin{itemize}
-    \item \textbf{Tìm hiểu nguyên lý tác tử AI và cơ chế gọi công cụ}: Nắm được nguyên lý hoạt động của mô hình suy luận nhiều bước ReAct và cơ chế gọi công cụ ngoại vi (Tool Calling) để tương tác có kiểm soát với hệ thống tệp.
+    \item \textbf{Tìm hiểu nguyên lý tác tử AI và cơ chế gọi công cụ}: Nắm được nguyên lý hoạt động của mô hình suy luận nhiều bước ReAct và cơ chế gọi công cụ ngoại vi (Tool Calling) để tương tác có kiểm soát với hệ thống tệp dự án phần mềm.
     \item \textbf{Ứng dụng khung làm việc Spring AI}: Sử dụng Spring AI kết nối với mô hình Google Gemini, áp dụng giao diện \texttt{ChatClient}, nạp lời nhắc từ tệp tài nguyên và đăng ký các công cụ thao tác tệp.
     \item \textbf{Thiết kế lời nhắc hệ thống}: Xây dựng tệp lời nhắc \texttt{prompts/code-reviewer.md} hướng dẫn mô hình thực hiện rà soát theo quy trình, loại bỏ các thư mục không cần thiết và định dạng kết quả trả về dưới dạng JSON có cấu trúc.
 \end{itemize}

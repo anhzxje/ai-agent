@@ -20,6 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
 
+/**
+ * Kiểm thử Đơn vị cho AgentTaskController (AgentTaskControllerTest):
+ * Kiểm tra các endpoint tạo task, lấy task theo ID, lấy danh sách task của tôi,
+ * ghim task và lọc task theo dự án.
+ */
 @ExtendWith(MockitoExtension.class)
 class AgentTaskControllerTest {
 

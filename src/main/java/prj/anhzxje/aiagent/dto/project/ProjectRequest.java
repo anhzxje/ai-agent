@@ -6,6 +6,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Đối tượng DTO yêu cầu tạo hoặc cập nhật Dự án (Project Request):
+ * Gửi thông tin thư mục mã nguồn từ client lên server.
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

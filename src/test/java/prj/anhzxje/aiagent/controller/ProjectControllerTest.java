@@ -18,6 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
+/**
+ * Kiểm thử Đơn vị cho ProjectController (ProjectControllerTest):
+ * Kiểm tra các endpoint tạo mới, truy xuất danh sách dự án của tôi, xem chi tiết và xóa dự án.
+ */
 @ExtendWith(MockitoExtension.class)
 class ProjectControllerTest {
 

@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * Đối tượng DTO phản hồi thông tin Dự án (Project Response):
+ * Trả về thông tin dự án kèm tên chủ sở hữu cho frontend.
+ */
 @Data
 @Builder
 @AllArgsConstructor

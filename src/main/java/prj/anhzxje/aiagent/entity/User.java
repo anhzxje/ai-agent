@@ -6,6 +6,11 @@ import prj.anhzxje.aiagent.enums.Role;
 
 import java.time.LocalDateTime;
 
+/**
+ * Thực thể Người dùng (User Account):
+ * Lưu trữ thông tin tài khoản đăng nhập, email, mật khẩu mã hóa BCrypt,
+ * vai trò phân quyền (USER / ADMIN) và trạng thái tài khoản (bị khóa hay đang hoạt động).
+ */
 @Entity
 @Table(name = "users")
 @Getter
@@ -32,6 +37,10 @@ public class User {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private Role role = Role.USER;
+
+    @Column(name = "is_locked")
+    @Builder.Default
+    private Boolean isLocked = false;
 
     @Column(nullable = false, updatable = false)
     @Builder.Default

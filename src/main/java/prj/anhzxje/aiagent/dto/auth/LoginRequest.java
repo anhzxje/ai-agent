@@ -5,6 +5,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Đối tượng DTO yêu cầu Đăng nhập (Login Request):
+ * Chứa tên đăng nhập và mật khẩu của người dùng.
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

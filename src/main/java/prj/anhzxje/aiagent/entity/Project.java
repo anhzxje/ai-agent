@@ -5,6 +5,11 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Thực thể Dự án Mã nguồn (Project):
+ * Đại diện cho một dự án/thư mục mã nguồn mà người dùng đã đăng ký vào hệ thống để AI Agent phân tích.
+ * Ánh xạ tới bảng `projects` trong CSDL MySQL.
+ */
 @Entity
 @Table(name = "projects")
 @Getter

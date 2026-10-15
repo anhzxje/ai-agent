@@ -1,0 +1,25 @@
+{
+  "name": "soopi-ai-agent",
+  "productName": "Soopi - AI Agent",
+  "version": "1.0.0",
+  "description": "Soopi - AI Agent Platform Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "copy-assets": "powershell -Command \"Copy-Item -Path '../src/main/resources/static/*' -Destination 'app' -Recurse -Force\"",
+    "package-win": "npm run copy-assets && electron-packager . Soopi --platform=win32 --arch=x64 --out=dist --overwrite --asar",
+    "build": "npm run package-win"
+  },
+  "keywords": [
+    "ai-agent",
+    "code-review",
+    "soopi",
+    "spring-ai"
+  ],
+  "author": "anhzxje",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/packager": "^18.4.1",
+    "electron": "^41.2.0"
+  }
+}

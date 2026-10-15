@@ -18,6 +18,13 @@ import prj.anhzxje.aiagent.enums.Role;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * Kiểm thử Bộ lọc Xác thực JWT (JwtAuthenticationFilterTest):
+ * Kiểm tra các tình huống:
+ * 1. Request có JWT token hợp lệ -> nạp authentication vào SecurityContext.
+ * 2. Request không có Header Authorization -> bỏ qua và cho đi tiếp.
+ * 3. Request có token nhưng tài khoản bị khóa (isLocked=true) -> không nạp vào SecurityContext.
+ */
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 

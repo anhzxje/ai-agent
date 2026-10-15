@@ -14,6 +14,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+/**
+ * Kiểm thử Đơn vị cho AI Code Review Agent (CodeReviewAgentTest):
+ * Sử dụng Mockito để giả lập ChatClient và kiểm thử:
+ * 1. Các trọng tâm đánh giá khác nhau (security, performance, bug, code_quality, all).
+ * 2. Khả năng bóc tách, làm sạch định dạng Markdown JSON ("```json ... ```").
+ * 3. Xử lý trường hợp phản hồi rỗng từ LLM.
+ */
 @ExtendWith(MockitoExtension.class)
 class CodeReviewAgentTest {
 
@@ -27,7 +34,6 @@ class CodeReviewAgentTest {
     void testReviewPath_WithDifferentFocusTypes() {
         when(chatClientBuilder.defaultSystem(anyString())).thenReturn(chatClientBuilder);
         when(chatClientBuilder.defaultOptions(any())).thenReturn(chatClientBuilder);
-        when(chatClientBuilder.defaultTools(any(), any(), any(), any())).thenReturn(chatClientBuilder);
         when(chatClientBuilder.build()).thenReturn(chatClient);
 
         CodeReviewAgent agent = new CodeReviewAgent(chatClientBuilder);
@@ -58,7 +64,6 @@ class CodeReviewAgentTest {
     void testCleanJsonResponse() {
         when(chatClientBuilder.defaultSystem(anyString())).thenReturn(chatClientBuilder);
         when(chatClientBuilder.defaultOptions(any())).thenReturn(chatClientBuilder);
-        when(chatClientBuilder.defaultTools(any(), any(), any(), any())).thenReturn(chatClientBuilder);
         when(chatClientBuilder.build()).thenReturn(chatClient);
 
         CodeReviewAgent agent = new CodeReviewAgent(chatClientBuilder);

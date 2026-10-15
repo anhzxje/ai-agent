@@ -10,6 +10,11 @@ import prj.anhzxje.aiagent.enums.TaskType;
 
 import java.time.LocalDateTime;
 
+/**
+ * Đối tượng DTO phản hồi chi tiết Tác vụ AI (Agent Task Response):
+ * Trả về thông tin trạng thái thực thi, kết quả review/fix và mã lỗi nếu có.
+ * Sử dụng @JsonRawValue để output và input dạng chuỗi JSON thô được serialize thẳng thành JSON object thực thụ.
+ */
 @Data
 @Builder
 @AllArgsConstructor
@@ -30,4 +35,5 @@ public class AgentTaskResponse {
     private String errorMessage;
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
+    private Boolean isPinned;
 }

@@ -7,6 +7,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Đối tượng DTO yêu cầu Đăng ký Tài khoản (Register Request):
+ * Chứa username, email và password được kiểm tra định dạng qua Bean Validation.
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

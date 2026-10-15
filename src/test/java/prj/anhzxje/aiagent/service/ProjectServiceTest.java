@@ -25,6 +25,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * Kiểm thử Đơn vị cho Tầng Dịch vụ Dự án (ProjectServiceTest):
+ * Kiểm tra:
+ * 1. Đăng ký dự án mới gắn liền với tài khoản người dùng đăng nhập.
+ * 2. Cập nhật thông tin dự án (tên, mô tả, đường dẫn, ngôn ngữ).
+ * 3. Kiểm tra bảo mật cách ly: không cho phép người dùng đọc/sửa/xóa dự án của người khác.
+ * 4. Xóa dự án thành công khi đúng chủ sở hữu.
+ */
 @ExtendWith(MockitoExtension.class)
 class ProjectServiceTest {
 
@@ -65,7 +73,7 @@ class ProjectServiceTest {
 
     @Test
     void testGetMyProjects() {
-        when(projectRepository.findByUserId(1L)).thenReturn(List.of(sampleProject));
+        when(projectRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(sampleProject));
 
         List<ProjectResponse> result = projectService.getMyProjects();
 

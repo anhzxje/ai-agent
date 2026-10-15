@@ -7,6 +7,10 @@ import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Kiểm thử Cơ chế Tạo và Kiểm tra JWT Token (JwtTokenProviderTest):
+ * Kiểm tra việc sinh token HMAC-SHA256, giải mã username và phát hiện token không hợp lệ / sai chữ ký.
+ */
 class JwtTokenProviderTest {
 
     private JwtTokenProvider jwtTokenProvider;
