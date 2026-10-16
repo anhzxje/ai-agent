@@ -55,12 +55,18 @@ public class ChatController {
      */
     @PostMapping("/conversations")
     public ResponseEntity<ChatConversationResponse> createConversation(
-            @RequestBody(required = false) Map<String, String> body,
+            @RequestBody(required = false) Map<String, Object> body,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        String title = body != null ? body.get("title") : null;
-        String model = body != null ? body.get("model") : null;
+        String title = body != null && body.get("title") != null ? body.get("title").toString() : null;
+        String model = body != null && body.get("model") != null ? body.get("model").toString() : null;
+        Long projectId = null;
+        if (body != null && body.get("projectId") != null) {
+            try {
+                projectId = Long.valueOf(body.get("projectId").toString());
+            } catch (NumberFormatException ignored) {}
+        }
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(chatService.createConversation(userDetails.getUser(), title, model));
+                .body(chatService.createConversation(userDetails.getUser(), title, model, projectId));
     }
 
     /**

@@ -19,10 +19,14 @@
 (function() {
   // App State
   const state = {
-    view: "welcome", // "welcome" | "workspace"
+    view: "chat", // "chat" | "welcome" | "workspace"
     projects: [],
     tasks: [],
     pinnedTasks: [],
+    conversations: [],
+    activeConversationId: null,
+    activeConversation: null,
+    isChatSending: false,
     activeProject: null,
     activeTask: null,
     activeTab: "findings",
@@ -36,6 +40,26 @@
     landingView: document.getElementById("landingView"),
     welcomeView: document.getElementById("welcomeView"),
     workspaceView: document.getElementById("workspaceView"),
+    chatAssistantView: document.getElementById("chatAssistantView"),
+    navModePills: document.getElementById("navModePills"),
+    btnModeChat: document.getElementById("btnModeChat"),
+    btnModeReview: document.getElementById("btnModeReview"),
+    sectionSidebarConversations: document.getElementById("sectionSidebarConversations"),
+    btnSidebarNewChat: document.getElementById("btnSidebarNewChat"),
+    sidebarConversationsContainer: document.getElementById("sidebarConversationsContainer"),
+    activeChatTitle: document.getElementById("activeChatTitle"),
+    selectChatProject: document.getElementById("selectChatProject"),
+    chatModelBadge: document.getElementById("chatModelBadge"),
+    btnHeaderNewChat: document.getElementById("btnHeaderNewChat"),
+    btnDeleteActiveChat: document.getElementById("btnDeleteActiveChat"),
+    chatStreamArea: document.getElementById("chatStreamArea"),
+    chatEmptyState: document.getElementById("chatEmptyState"),
+    chatMessagesList: document.getElementById("chatMessagesList"),
+    chatTypingIndicator: document.getElementById("chatTypingIndicator"),
+    chatTypingText: document.getElementById("chatTypingText"),
+    centralChatTextarea: document.getElementById("centralChatTextarea"),
+    btnSendCentralChat: document.getElementById("btnSendCentralChat"),
+    chatProjectHintText: document.getElementById("chatProjectHintText"),
     btnLandingLogin: document.getElementById("btnLandingLogin"),
     btnLandingRegister: document.getElementById("btnLandingRegister"),
     sectionPinnedTasks: document.getElementById("sectionPinnedTasks"),
@@ -761,115 +785,370 @@
   }
 
   // ==========================================================================
-  // Interactive AI Chat Handlers
+  // AI CODING ASSISTANT CHATBOT PLATFORM CONTROLLER
   // ==========================================================================
-  let activeChatConversationId = null;
 
+  // Markdown Formatter with Syntax Highlighting and Code Copy
+  function formatMarkdown(content) {
+    if (!content) return "";
+    let html = content;
+
+    // Escape HTML first to prevent XSS
+    html = html
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    // Code blocks with header and copy button
+    html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+      const language = lang ? lang.toLowerCase() : "code";
+      const cleanCode = code.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+      const encodedCode = encodeURIComponent(cleanCode);
+      return `
+        <div class="chat-code-block">
+          <div class="code-header-bar">
+            <span>${language}</span>
+            <button class="btn-code-copy" onclick="copyCodeSnippet(this, decodeURIComponent('${encodedCode}'))">Sao chép</button>
+          </div>
+          <pre><code class="language-${language}">${code}</code></pre>
+        </div>
+      `;
+    });
+
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+    // Bold
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+    // Italic
+    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+
+    // Headings
+    html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
+    html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
+    html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
+
+    // Lists
+    html = html.replace(/^\s*[-*]\s+(.*$)/gim, "<li>$1</li>");
+    html = html.replace(/(<li>.*<\/li>)/gims, "<ul>$1</ul>");
+
+    // Paragraphs and breaks
+    html = html.replace(/\n\n/g, "</p><p>");
+    html = html.replace(/\n/g, "<br>");
+
+    return `<p>${html}</p>`;
+  }
+
+  // Global helper for code snippet copy
+  window.copyCodeSnippet = function(btn, code) {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(code).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = "Đã chép!";
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }).catch(e => console.warn("Lỗi sao chép:", e));
+  };
+
+  // Populate Chat Project Context Dropdown
+  function populateChatProjectDropdown() {
+    if (!el.selectChatProject) return;
+    const currentVal = el.selectChatProject.value;
+    let optionsHtml = `<option value="">Không gắn dự án (Hỏi đáp chung)</option>`;
+    if (state.projects && state.projects.length > 0) {
+      optionsHtml += state.projects.map(p => `
+        <option value="${p.id}" ${currentVal == p.id ? 'selected' : ''}>
+          ${p.name} (${p.language || 'Code'})
+        </option>
+      `).join("");
+    }
+    el.selectChatProject.innerHTML = optionsHtml;
+    updateChatProjectHint();
+  }
+
+  function updateChatProjectHint() {
+    if (!el.chatProjectHintText || !el.selectChatProject) return;
+    const pId = el.selectChatProject.value;
+    if (pId) {
+      const p = state.projects.find(proj => proj.id == pId);
+      el.chatProjectHintText.textContent = `Ngữ cảnh: ${p ? p.name : 'Dự án'}`;
+    } else {
+      el.chatProjectHintText.textContent = `Ngữ cảnh: Chung (Không gắn dự án)`;
+    }
+  }
+
+  // Load and Render Conversations
   async function loadChatConversations() {
-    const listEl = document.getElementById("chatConversationsList");
-    if (!listEl) return;
+    if (!state.currentUser) return;
     try {
       const convs = await window.apiClient.getChatConversations();
-      if (!convs || convs.length === 0) {
-        listEl.innerHTML = `<div style="font-size: 11px; color: var(--text-muted); padding: 8px;">Chưa có hội thoại nào</div>`;
-        return;
-      }
-      listEl.innerHTML = convs.map(c => `
-        <div class="chat-conv-item ${c.id === activeChatConversationId ? 'active' : ''}" data-conv-id="${c.id}" title="${c.title}">
-          ${c.title || 'Hội thoại #' + c.id}
-        </div>
-      `).join("");
+      state.conversations = convs || [];
+      renderSidebarConversations();
 
-      listEl.querySelectorAll(".chat-conv-item").forEach(item => {
-        item.onclick = () => {
-          const id = Number(item.getAttribute("data-conv-id"));
-          selectChatConversation(id);
-        };
-      });
-
-      if (!activeChatConversationId && convs.length > 0) {
-        selectChatConversation(convs[0].id);
-      }
-    } catch (e) {
-      console.warn("Could not load chat conversations", e);
-    }
-  }
-
-  async function selectChatConversation(id) {
-    activeChatConversationId = id;
-    const listEl = document.getElementById("chatConversationsList");
-    if (listEl) {
-      listEl.querySelectorAll(".chat-conv-item").forEach(item => {
-        item.classList.toggle("active", Number(item.getAttribute("data-conv-id")) === id);
-      });
-    }
-    const container = document.getElementById("chatMessagesContainer");
-    if (container) {
-      container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">Đang tải tin nhắn...</div>`;
-      try {
-        const detail = await window.apiClient.getChatConversationDetail(id);
-        if (detail && detail.messages && detail.messages.length > 0) {
-          container.innerHTML = detail.messages.map(m => `
-            <div class="chat-msg-row ${m.sender === 'USER' ? 'user' : 'agent'}">
-              <div class="chat-msg-bubble">${m.content}</div>
-              <div class="chat-msg-meta">${m.sender === 'USER' ? 'Bạn' : 'Soopi Agent'} • ${new Date(m.createdAt).toLocaleTimeString('vi-VN')}</div>
+      // Đồng bộ danh sách trong workspace tab nếu có
+      const wsChatList = document.getElementById("chatConversationsList");
+      if (wsChatList) {
+        if (state.conversations.length === 0) {
+          wsChatList.innerHTML = `<div style="font-size: 11px; color: var(--text-muted); padding: 8px;">Chưa có hội thoại nào</div>`;
+        } else {
+          wsChatList.innerHTML = state.conversations.map(c => `
+            <div class="chat-conv-item ${c.id === state.activeConversationId ? 'active' : ''}" data-conv-id="${c.id}" title="${c.title}">
+              ${c.title || 'Hội thoại #' + c.id}
             </div>
           `).join("");
-          container.scrollTop = container.scrollHeight;
-        } else {
-          container.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 40px;">Bắt đầu trò chuyện với AI Agent!</div>`;
+          wsChatList.querySelectorAll(".chat-conv-item").forEach(item => {
+            item.onclick = () => selectChatConversation(Number(item.getAttribute("data-conv-id")));
+          });
         }
-      } catch (e) {
-        container.innerHTML = `<div style="color: var(--diff-del); text-align: center;">Lỗi tải tin nhắn: ${e.message}</div>`;
+      }
+
+      // Auto-select latest conversation or start new
+      if (!state.activeConversationId && state.conversations.length > 0) {
+        await selectChatConversation(state.conversations[0].id);
+      } else if (!state.activeConversationId && state.conversations.length === 0) {
+        startNewChatConversation();
+      }
+    } catch (e) {
+      console.warn("Không thể tải danh sách cuộc hội thoại:", e);
+    }
+  }
+
+  function renderSidebarConversations() {
+    if (!el.sidebarConversationsContainer) return;
+    if (state.conversations.length === 0) {
+      el.sidebarConversationsContainer.innerHTML = `
+        <div style="padding: 10px; font-size: 11.5px; color: var(--text-muted); text-align: center;">
+          Chưa có đoạn chat nào.<br>
+          <span style="color: var(--primary-accent); cursor: pointer;" id="btnEmptyStartChat">+ Bắt đầu trò chuyện</span>
+        </div>
+      `;
+      const btn = document.getElementById("btnEmptyStartChat");
+      if (btn) btn.onclick = startNewChatConversation;
+      return;
+    }
+
+    el.sidebarConversationsContainer.innerHTML = state.conversations.map(c => {
+      const isActive = c.id === state.activeConversationId;
+      const timeAgo = formatRelativeTime(c.updatedAt || c.createdAt);
+      return `
+        <div class="sidebar-conv-item ${isActive ? 'active' : ''}" data-conv-id="${c.id}" title="${c.title || 'Hội thoại'}">
+          <div class="sidebar-conv-info">
+            <span class="sidebar-conv-title">${c.title || 'Cuộc hội thoại #' + c.id}</span>
+            <div class="sidebar-conv-meta">
+              ${c.projectName ? `<span class="sidebar-conv-tag">${c.projectName}</span>` : ''}
+              <span>${timeAgo}</span>
+            </div>
+          </div>
+          <button class="sidebar-conv-del" data-del-conv-id="${c.id}" title="Xóa cuộc hội thoại">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+      `;
+    }).join("");
+
+    // Attach click events to conversation items
+    el.sidebarConversationsContainer.querySelectorAll("[data-conv-id]").forEach(item => {
+      item.addEventListener("click", (e) => {
+        if (e.target.closest("[data-del-conv-id]")) return;
+        const id = Number(item.getAttribute("data-conv-id"));
+        selectChatConversation(id);
+      });
+    });
+
+    // Attach click events to delete buttons
+    el.sidebarConversationsContainer.querySelectorAll("[data-del-conv-id]").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const id = Number(btn.getAttribute("data-del-conv-id"));
+        await deleteChatConversationById(id);
+      });
+    });
+  }
+
+  // Select a Conversation and Load Messages
+  async function selectChatConversation(id) {
+    state.activeConversationId = id;
+    state.view = "chat";
+    renderView();
+    renderSidebarConversations();
+
+    if (el.chatStreamArea) {
+      if (el.chatEmptyState) el.chatEmptyState.style.display = "none";
+      if (el.chatMessagesList) {
+        el.chatMessagesList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 30px;">Đang tải tin nhắn...</div>`;
+      }
+    }
+
+    try {
+      const detail = await window.apiClient.getChatConversationDetail(id);
+      state.activeConversation = detail;
+
+      if (el.activeChatTitle) el.activeChatTitle.textContent = detail.title || "Cuộc trò chuyện";
+      if (el.chatModelBadge) el.chatModelBadge.textContent = detail.model || "gemini-3.5-flash-lite";
+
+      if (el.selectChatProject && detail.projectId) {
+        el.selectChatProject.value = detail.projectId;
+        updateChatProjectHint();
+      }
+
+      renderChatMessagesStream(detail.messages || []);
+    } catch (e) {
+      console.error("Lỗi khi tải chi tiết cuộc hội thoại:", e);
+      if (el.chatMessagesList) {
+        el.chatMessagesList.innerHTML = `<div style="color: var(--diff-del); text-align: center; padding: 20px;">Không thể tải tin nhắn: ${e.message}</div>`;
       }
     }
   }
 
-  async function handleSendChatMessage() {
-    const input = document.getElementById("inputChatMessage");
-    if (!input) return;
-    const msg = input.value.trim();
-    if (!msg) return;
+  function renderChatMessagesStream(messages) {
+    if (!el.chatMessagesList) return;
+    if (!messages || messages.length === 0) {
+      if (el.chatEmptyState) el.chatEmptyState.style.display = "flex";
+      el.chatMessagesList.innerHTML = "";
+      return;
+    }
 
-    input.value = "";
-    const container = document.getElementById("chatMessagesContainer");
-    if (container) {
-      const userBubble = document.createElement("div");
-      userBubble.className = "chat-msg-row user";
-      userBubble.innerHTML = `
-        <div class="chat-msg-bubble">${msg}</div>
-        <div class="chat-msg-meta">Bạn • ${new Date().toLocaleTimeString('vi-VN')}</div>
-      `;
-      container.appendChild(userBubble);
+    if (el.chatEmptyState) el.chatEmptyState.style.display = "none";
 
-      const typingBubble = document.createElement("div");
-      typingBubble.className = "chat-msg-row agent";
-      typingBubble.id = "agentTypingBubble";
-      typingBubble.innerHTML = `
-        <div class="chat-msg-bubble" style="opacity: 0.7;">Soopi Agent đang suy nghĩ...</div>
-      `;
-      container.appendChild(typingBubble);
-      container.scrollTop = container.scrollHeight;
+    el.chatMessagesList.innerHTML = messages.map(m => {
+      const isUser = m.sender === "USER";
+      const userInitial = state.currentUser ? state.currentUser.username.charAt(0).toUpperCase() : "U";
 
-      try {
-        const res = await window.apiClient.sendChatMessage(msg, activeChatConversationId);
-        typingBubble.remove();
-        if (res) {
-          activeChatConversationId = res.conversationId;
-          const agentBubble = document.createElement("div");
-          agentBubble.className = "chat-msg-row agent";
-          agentBubble.innerHTML = `
-            <div class="chat-msg-bubble">${res.content}</div>
-            <div class="chat-msg-meta">Soopi Agent • ${new Date(res.createdAt).toLocaleTimeString('vi-VN')}</div>
-          `;
-          container.appendChild(agentBubble);
-          container.scrollTop = container.scrollHeight;
-          loadChatConversations();
-        }
-      } catch (e) {
-        typingBubble.remove();
-        alert("Lỗi khi gửi tin nhắn: " + e.message);
+      let bodyHtml;
+      if (isUser) {
+        bodyHtml = `<div class="chat-msg-bubble">${m.content}</div>`;
+      } else {
+        bodyHtml = `<div class="chat-msg-bubble">${formatMarkdown(m.content)}</div>`;
       }
+
+      return `
+        <div class="chat-msg-row ${isUser ? 'user' : 'agent'}">
+          <div class="chat-msg-avatar">${isUser ? userInitial : 'AI'}</div>
+          ${bodyHtml}
+        </div>
+      `;
+    }).join("");
+
+    if (el.chatStreamArea) {
+      el.chatStreamArea.scrollTop = el.chatStreamArea.scrollHeight;
+    }
+  }
+
+  // Start New Conversation
+  function startNewChatConversation() {
+    state.activeConversationId = null;
+    state.activeConversation = null;
+    state.view = "chat";
+    renderView();
+    renderSidebarConversations();
+
+    if (el.activeChatTitle) el.activeChatTitle.textContent = "Cuộc trò chuyện mới";
+    if (el.chatEmptyState) el.chatEmptyState.style.display = "flex";
+    if (el.chatMessagesList) el.chatMessagesList.innerHTML = "";
+    if (el.centralChatTextarea) {
+      el.centralChatTextarea.value = "";
+      el.centralChatTextarea.focus();
+    }
+  }
+
+  // Delete Conversation
+  async function deleteChatConversationById(convId) {
+    if (!confirm(`Bạn có chắc chắn muốn xóa cuộc hội thoại này không?`)) return;
+    try {
+      await window.apiClient.deleteChatConversation(convId);
+      state.conversations = state.conversations.filter(c => c.id !== convId);
+      if (state.activeConversationId === convId) {
+        startNewChatConversation();
+      } else {
+        renderSidebarConversations();
+      }
+    } catch (e) {
+      alert("Lỗi khi xóa cuộc hội thoại: " + e.message);
+    }
+  }
+
+  // Send Message from Central Chat Input
+  async function handleSendCentralChatMessage(customPrompt) {
+    if (state.isChatSending) return;
+
+    const message = customPrompt || (el.centralChatTextarea ? el.centralChatTextarea.value.trim() : "");
+    if (!message) return;
+
+    if (el.centralChatTextarea) el.centralChatTextarea.value = "";
+    state.isChatSending = true;
+
+    // Show message immediately in UI
+    if (el.chatEmptyState) el.chatEmptyState.style.display = "none";
+    const userInitial = state.currentUser ? state.currentUser.username.charAt(0).toUpperCase() : "U";
+
+    const userRow = document.createElement("div");
+    userRow.className = "chat-msg-row user";
+    userRow.innerHTML = `
+      <div class="chat-msg-avatar">${userInitial}</div>
+      <div class="chat-msg-bubble">${message}</div>
+    `;
+    if (el.chatMessagesList) el.chatMessagesList.appendChild(userRow);
+
+    // Show Typing Indicator
+    if (el.chatTypingIndicator) el.chatTypingIndicator.style.display = "flex";
+    if (el.btnSendCentralChat) el.btnSendCentralChat.disabled = true;
+    if (el.chatStreamArea) el.chatStreamArea.scrollTop = el.chatStreamArea.scrollHeight;
+
+    // Determine Project Context
+    let projectId = null;
+    if (el.selectChatProject && el.selectChatProject.value) {
+      projectId = Number(el.selectChatProject.value);
+    } else if (state.activeConversation && state.activeConversation.projectId) {
+      projectId = state.activeConversation.projectId;
+    } else if (state.activeProject && state.activeProject.id) {
+      projectId = state.activeProject.id;
+    }
+
+    try {
+      const response = await window.apiClient.sendChatMessage(
+        message,
+        state.activeConversationId,
+        null,
+        projectId
+      );
+
+      if (el.chatTypingIndicator) el.chatTypingIndicator.style.display = "none";
+
+      if (response) {
+        // Update active conversation ID if newly created
+        if (!state.activeConversationId && response.conversationId) {
+          state.activeConversationId = response.conversationId;
+        }
+
+        const agentRow = document.createElement("div");
+        agentRow.className = "chat-msg-row agent";
+        agentRow.innerHTML = `
+          <div class="chat-msg-avatar">AI</div>
+          <div class="chat-msg-bubble">${formatMarkdown(response.content)}</div>
+        `;
+        if (el.chatMessagesList) el.chatMessagesList.appendChild(agentRow);
+
+        // Reload conversations to update title in sidebar
+        await loadChatConversations();
+      }
+    } catch (e) {
+      if (el.chatTypingIndicator) el.chatTypingIndicator.style.display = "none";
+      const errRow = document.createElement("div");
+      errRow.className = "chat-msg-row agent";
+      errRow.innerHTML = `
+        <div class="chat-msg-avatar" style="color: var(--diff-del);">!</div>
+        <div class="chat-msg-bubble" style="border-color: rgba(239, 68, 68, 0.4); color: var(--diff-del);">
+          Đã xảy ra lỗi khi trao đổi với AI: ${e.message}
+        </div>
+      `;
+      if (el.chatMessagesList) el.chatMessagesList.appendChild(errRow);
+    } finally {
+      state.isChatSending = false;
+      if (el.btnSendCentralChat) el.btnSendCentralChat.disabled = false;
+      if (el.chatStreamArea) el.chatStreamArea.scrollTop = el.chatStreamArea.scrollHeight;
     }
   }
 
@@ -899,20 +1178,35 @@
     });
   }
 
-  // View Switcher: Unauthenticated Landing vs Welcome vs Workspace
+  // View Switcher: Unauthenticated Landing vs Chatbot vs Welcome vs Workspace
   function renderView() {
     if (!state.currentUser) {
       if (el.landingView) el.landingView.style.display = "flex";
+      if (el.chatAssistantView) el.chatAssistantView.style.display = "none";
       if (el.welcomeView) el.welcomeView.style.display = "none";
       if (el.workspaceView) el.workspaceView.style.display = "none";
+      if (el.navModePills) el.navModePills.style.display = "none";
+      if (el.sectionSidebarConversations) el.sectionSidebarConversations.style.display = "none";
       if (el.appSidebar) el.appSidebar.classList.add("collapsed");
     } else {
       if (el.landingView) el.landingView.style.display = "none";
       if (el.appSidebar) el.appSidebar.classList.remove("collapsed");
-      if (state.view === "workspace" && state.activeTask) {
+      if (el.navModePills) el.navModePills.style.display = "inline-flex";
+      if (el.sectionSidebarConversations) el.sectionSidebarConversations.style.display = "block";
+
+      if (el.btnModeChat) el.btnModeChat.classList.toggle("active", state.view === "chat");
+      if (el.btnModeReview) el.btnModeReview.classList.toggle("active", state.view !== "chat");
+
+      if (state.view === "chat") {
+        if (el.chatAssistantView) el.chatAssistantView.style.display = "flex";
+        if (el.welcomeView) el.welcomeView.style.display = "none";
+        if (el.workspaceView) el.workspaceView.style.display = "none";
+      } else if (state.view === "workspace" && state.activeTask) {
+        if (el.chatAssistantView) el.chatAssistantView.style.display = "none";
         if (el.welcomeView) el.welcomeView.style.display = "none";
         if (el.workspaceView) el.workspaceView.style.display = "flex";
       } else {
+        if (el.chatAssistantView) el.chatAssistantView.style.display = "none";
         if (el.welcomeView) el.welcomeView.style.display = "flex";
         if (el.workspaceView) el.workspaceView.style.display = "none";
       }
@@ -1005,6 +1299,8 @@
       renderSidebar();
       renderWelcomeTasks();
       populateProjectSelect();
+      populateChatProjectDropdown();
+      await loadChatConversations();
       startTaskPollingIfNeeded();
 
       if (state.currentUser && state.currentUser.role === 'ADMIN') {
@@ -1873,25 +2169,86 @@
       });
     }
 
-    // Chat Controls (New Conv, Send button, Enter key)
-    const btnNewChat = document.getElementById("btnNewChatConversation");
-    if (btnNewChat) {
-      btnNewChat.addEventListener("click", () => {
-        activeChatConversationId = null;
-        const container = document.getElementById("chatMessagesContainer");
-        if (container) {
-          container.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 40px;">Bắt đầu phiên hội thoại mới với AI Agent!</div>`;
-        }
-        const listEl = document.getElementById("chatConversationsList");
-        if (listEl) {
-          listEl.querySelectorAll(".chat-conv-item").forEach(i => i.classList.remove("active"));
+    // Mode Switcher Pills (Chatbot vs Code Review)
+    if (el.btnModeChat) {
+      el.btnModeChat.addEventListener("click", () => {
+        state.view = "chat";
+        renderView();
+      });
+    }
+
+    if (el.btnModeReview) {
+      el.btnModeReview.addEventListener("click", () => {
+        state.view = state.activeTask ? "workspace" : "welcome";
+        renderView();
+      });
+    }
+
+    // Sidebar & Header New Chat buttons
+    if (el.btnSidebarNewChat) {
+      el.btnSidebarNewChat.addEventListener("click", startNewChatConversation);
+    }
+
+    if (el.btnHeaderNewChat) {
+      el.btnHeaderNewChat.addEventListener("click", startNewChatConversation);
+    }
+
+    // Header Delete Conversation button
+    if (el.btnDeleteActiveChat) {
+      el.btnDeleteActiveChat.addEventListener("click", () => {
+        if (state.activeConversationId) {
+          deleteChatConversationById(state.activeConversationId);
         }
       });
     }
 
+    // Central Chat Send Button & Enter Key
+    if (el.btnSendCentralChat) {
+      el.btnSendCentralChat.addEventListener("click", () => handleSendCentralChatMessage());
+    }
+
+    if (el.centralChatTextarea) {
+      el.centralChatTextarea.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          handleSendCentralChatMessage();
+        }
+      });
+    }
+
+    // Chat Project Context Selector
+    if (el.selectChatProject) {
+      el.selectChatProject.addEventListener("change", () => {
+        updateChatProjectHint();
+      });
+    }
+
+    // Suggestion Chips
+    document.querySelectorAll(".suggestion-chip[data-prompt]").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const prompt = chip.getAttribute("data-prompt");
+        if (prompt) {
+          handleSendCentralChatMessage(prompt);
+        }
+      });
+    });
+
+    // Legacy Workspace Chat Tab Controls
+    const btnNewChat = document.getElementById("btnNewChatConversation");
+    if (btnNewChat) {
+      btnNewChat.addEventListener("click", startNewChatConversation);
+    }
+
     const btnSendChat = document.getElementById("btnSendChatMessage");
     if (btnSendChat) {
-      btnSendChat.addEventListener("click", handleSendChatMessage);
+      btnSendChat.addEventListener("click", () => {
+        const inputChat = document.getElementById("inputChatMessage");
+        if (inputChat && inputChat.value.trim()) {
+          const val = inputChat.value.trim();
+          inputChat.value = "";
+          handleSendCentralChatMessage(val);
+        }
+      });
     }
 
     const inputChat = document.getElementById("inputChatMessage");
@@ -1899,7 +2256,11 @@
       inputChat.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          handleSendChatMessage();
+          if (inputChat.value.trim()) {
+            const val = inputChat.value.trim();
+            inputChat.value = "";
+            handleSendCentralChatMessage(val);
+          }
         }
       });
     }

@@ -40,6 +40,18 @@
           </svg>
         </button>
 
+        <!-- Mode Switcher: Chatbot vs Code Review -->
+        <div class="nav-mode-pills" id="navModePills" style="display: none;">
+          <button class="nav-mode-btn active" id="btnModeChat" title="Màn hình Trò chuyện AI Coding Assistant">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            Chatbot
+          </button>
+          <button class="nav-mode-btn" id="btnModeReview" title="Màn hình Tác vụ & Review mã nguồn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            Review Tasks
+          </button>
+        </div>
+
         <!-- Current Workspace Breadcrumb -->
         <div class="workspace-select-badge" id="btnSelectWorkspace" title="Dự án đang làm việc" style="display: none;">
           <span style="opacity: 0.6;">workspace</span>
@@ -98,6 +110,23 @@
       <!-- Left Sidebar (Edge-to-Edge) -->
       <aside class="app-sidebar" id="appSidebar">
         <div class="sidebar-scroll">
+
+          <!-- Section 0: CONVERSATIONS (Đoạn chat AI) -->
+          <div class="sidebar-section" id="sectionSidebarConversations" style="display: none;">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="section-label">Đoạn chat gần đây</span>
+              <button class="btn-sidebar-add" id="btnSidebarNewChat" title="Tạo cuộc hội thoại mới">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Mới</span>
+              </button>
+            </div>
+            <div id="sidebarConversationsContainer" class="sidebar-conversations-list">
+              <!-- Rendered via JS from real DB conversations -->
+            </div>
+          </div>
 
           <!-- Section 1: PINNED (Chỉ hiển thị khi có task được ghim) -->
           <div class="sidebar-section" id="sectionPinnedTasks" style="display: none;">
@@ -178,6 +207,85 @@
               <div class="landing-feat-card">
                 <div class="landing-feat-title">Tác tử Hội thoại Đa phiên</div>
                 <div class="landing-feat-desc">Hỗ trợ phiên trò chuyện tương tác đa lượt, thực thi lệnh hệ thống và truy xuất thông minh theo ngữ cảnh dự án.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 0.5: CENTRAL AI CODING ASSISTANT CHATBOT (Trung tâm tương tác chính) -->
+        <section class="chat-assistant-container" id="chatAssistantView" style="display: none;">
+          <!-- Chat Top Bar -->
+          <div class="chat-header-bar">
+            <div class="chat-header-left">
+              <div class="chat-title-wrap">
+                <h2 id="activeChatTitle" class="chat-active-title">Cuộc trò chuyện mới</h2>
+                <span class="chat-status-dot" title="Gemini AI & Tools Sẵn sàng"></span>
+              </div>
+              <div class="chat-context-row">
+                <label for="selectChatProject" class="chat-context-label">Ngữ cảnh dự án:</label>
+                <select id="selectChatProject" class="chat-project-dropdown">
+                  <option value="">Không gắn dự án (Hỏi đáp chung)</option>
+                </select>
+                <span class="chat-model-badge" id="chatModelBadge">gemini-3.5-flash-lite</span>
+              </div>
+            </div>
+            <div class="chat-header-right">
+              <button class="btn-nav-secondary" id="btnHeaderNewChat" title="Tạo cuộc hội thoại mới">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Chat mới
+              </button>
+              <button class="btn-nav-secondary btn-danger-soft" id="btnDeleteActiveChat" title="Xóa cuộc hội thoại này">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Messages Stream Scroll Area -->
+          <div class="chat-stream-area" id="chatStreamArea">
+            <div class="chat-empty-state" id="chatEmptyState">
+              <div class="empty-ai-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </div>
+              <h3>Soopi AI Coding Assistant</h3>
+              <p>Trợ lý lập trình thông minh của bạn. Tự động tương tác với codebase qua các công cụ duyệt tệp, grep và phân tích rà soát mã nguồn chuyên sâu.</p>
+              <div class="chat-prompt-suggestions" id="chatPromptSuggestions">
+                <button class="suggestion-chip" data-prompt="Khám phá cấu trúc dự án này và liệt kê các thư mục chính">🔍 Khám phá cấu trúc dự án</button>
+                <button class="suggestion-chip" data-prompt="Hãy rà soát các vấn đề bảo mật và logic quan trọng trong dự án này">🛡️ Rà soát bảo mật & logic dự án</button>
+                <button class="suggestion-chip" data-prompt="Giải thích luồng xác thực Spring Security và cơ chế JWT trong codebase này">⚡ Giải thích luồng xác thực JWT</button>
+              </div>
+            </div>
+            <div class="chat-messages-list" id="chatMessagesList">
+              <!-- Dynamic message cards populated here -->
+            </div>
+            <!-- Typing & Reasoning indicator -->
+            <div class="chat-typing-indicator" id="chatTypingIndicator" style="display: none;">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-text" id="chatTypingText">Soopi đang suy nghĩ và kiểm tra mã nguồn...</span>
+            </div>
+          </div>
+
+          <!-- Chat Input Dock -->
+          <div class="chat-input-dock">
+            <div class="chat-input-wrapper">
+              <textarea id="centralChatTextarea" rows="2" placeholder="Hỏi Soopi về mã nguồn hoặc yêu cầu AI Review... (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
+              <div class="chat-input-actions">
+                <span class="chat-input-hint" id="chatProjectHintText">Đang làm việc trên: Chung</span>
+                <button class="btn-send-chat" id="btnSendCentralChat" title="Gửi tin nhắn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
               </div>
             </div>
           </div>

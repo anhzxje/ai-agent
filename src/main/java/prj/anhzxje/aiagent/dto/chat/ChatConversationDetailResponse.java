@@ -20,6 +20,9 @@ public class ChatConversationDetailResponse {
     private Long id;
     private String title;
     private String model;
+    private Long projectId;
+    private String projectName;
+    private String projectPath;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<ChatMessageResponse> messages;

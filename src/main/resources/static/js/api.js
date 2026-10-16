@@ -830,19 +830,19 @@ class AgentApiClient {
     try {
       const res = await fetch(`${this.baseUrl}/api/chat/conversations`, {
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(5000)
       });
       if (res.ok) return await res.json();
     } catch (e) {}
     return [];
   }
 
-  async createChatConversation(title, model) {
+  async createChatConversation(title, model, projectId) {
     const res = await fetch(`${this.baseUrl}/api/chat/conversations`, {
       method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify({ title, model }),
-      signal: AbortSignal.timeout(3000)
+      body: JSON.stringify({ title, model, projectId }),
+      signal: AbortSignal.timeout(6000)
     });
     if (res.ok) return await res.json();
     throw new Error("Không thể tạo cuộc hội thoại mới");
@@ -851,7 +851,7 @@ class AgentApiClient {
   async getChatConversationDetail(convId) {
     const res = await fetch(`${this.baseUrl}/api/chat/conversations/${convId}`, {
       headers: this.getHeaders(),
-      signal: AbortSignal.timeout(4000)
+      signal: AbortSignal.timeout(6000)
     });
     if (res.ok) return await res.json();
     throw new Error("Không thể tải nội dung hội thoại");
@@ -861,18 +861,18 @@ class AgentApiClient {
     const res = await fetch(`${this.baseUrl}/api/chat/conversations/${convId}`, {
       method: "DELETE",
       headers: this.getHeaders(),
-      signal: AbortSignal.timeout(4000)
+      signal: AbortSignal.timeout(5000)
     });
     if (res.ok) return await res.json();
     throw new Error("Không thể xóa cuộc hội thoại");
   }
 
-  async sendChatMessage(message, conversationId, model) {
+  async sendChatMessage(message, conversationId, model, projectId) {
     const res = await fetch(`${this.baseUrl}/api/chat`, {
       method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify({ message, conversationId, model }),
-      signal: AbortSignal.timeout(15000)
+      body: JSON.stringify({ message, conversationId, model, projectId }),
+      signal: AbortSignal.timeout(60000) // 60s cho LLM + Tool calling trên codebase
     });
     if (res.ok) return await res.json();
     const err = await res.json().catch(() => ({ message: "Không thể gửi tin nhắn cho AI Agent" }));
