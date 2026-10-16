@@ -173,6 +173,13 @@ public class SystemConfigService {
         systemSettingRepository.save(setting);
     }
 
+    /**
+     * Làm mờ / che giấu khóa API Key để hiển thị an toàn trên giao diện Quản trị.
+     * Định dạng: Giữ lại 4 ký tự đầu và 4 ký tự cuối, thay thế phần giữa bằng '****' (VD: AIza****1234).
+     *
+     * @param key chuỗi khóa API thô
+     * @return chuỗi khóa đã được che giấu
+     */
     private String maskKey(String key) {
         if (key == null || key.length() < 8) return "********";
         int len = key.length();

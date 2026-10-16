@@ -16,6 +16,12 @@ public interface ChatConversationRepository extends JpaRepository<ChatConversati
     /** Lấy danh sách cuộc hội thoại của một người dùng cụ thể, sắp xếp theo lần cập nhật gần nhất */
     List<ChatConversation> findByUserIdOrderByUpdatedAtDesc(Long userId);
 
+    /** Lấy danh sách cuộc hội thoại của một người dùng cụ thể */
+    List<ChatConversation> findByUserId(Long userId);
+
     /** Tìm cuộc hội thoại theo id và ràng buộc đúng chủ sở hữu (userId) */
     Optional<ChatConversation> findByIdAndUserId(Long id, Long userId);
+
+    /** Xóa toàn bộ cuộc hội thoại của một người dùng cụ thể */
+    void deleteByUserId(Long userId);
 }

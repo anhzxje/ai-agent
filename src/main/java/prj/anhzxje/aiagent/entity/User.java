@@ -49,6 +49,9 @@ public class User {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    /**
+     * Callback JPA tự động làm mới thời điểm updatedAt khi có cập nhật mật khẩu, vai trò hoặc trạng thái tài khoản.
+     */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();

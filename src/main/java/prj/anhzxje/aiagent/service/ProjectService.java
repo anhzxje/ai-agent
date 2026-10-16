@@ -10,6 +10,7 @@ import prj.anhzxje.aiagent.dto.project.ProjectResponse;
 import prj.anhzxje.aiagent.entity.Project;
 import prj.anhzxje.aiagent.entity.User;
 import prj.anhzxje.aiagent.exception.ResourceNotFoundException;
+import prj.anhzxje.aiagent.repository.AgentTaskRepository;
 import prj.anhzxje.aiagent.repository.ProjectRepository;
 import prj.anhzxje.aiagent.security.CustomUserDetails;
 
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final AgentTaskRepository agentTaskRepository;
 
     /**
      * Lấy danh sách toàn bộ project thuộc quyền sở hữu của người dùng đang đăng nhập.
@@ -116,9 +118,15 @@ public class ProjectService {
         // Bước 1: Xác minh quyền sở hữu
         Project project = findProjectAndVerifyOwner(projectId);
         
-        // Bước 2: Xóa entity khỏi database
+        // Bước 2: Xóa toàn bộ các tác vụ AI liên quan để tránh lỗi khóa ngoại Foreign Key
+        List<prj.anhzxje.aiagent.entity.AgentTask> tasks = agentTaskRepository.findByProjectId(projectId);
+        if (!tasks.isEmpty()) {
+            agentTaskRepository.deleteAll(tasks);
+        }
+
+        // Bước 3: Xóa entity khỏi database
         projectRepository.delete(project);
-        log.info("Đã xóa project id={}", projectId);
+        log.info("Đã xóa project id={} cùng {} tác vụ liên quan", projectId, tasks.size());
     }
 
     // ────────────────────────────────────────────────

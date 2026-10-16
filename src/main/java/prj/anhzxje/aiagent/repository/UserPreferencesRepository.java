@@ -14,4 +14,7 @@ import java.util.Optional;
 public interface UserPreferencesRepository extends JpaRepository<UserPreferences, Long> {
     /** Tìm cài đặt tùy chọn của người dùng theo mã định danh tài khoản (userId) */
     Optional<UserPreferences> findByUserId(Long userId);
+
+    /** Xóa cài đặt tùy chọn của người dùng theo userId */
+    void deleteByUserId(Long userId);
 }

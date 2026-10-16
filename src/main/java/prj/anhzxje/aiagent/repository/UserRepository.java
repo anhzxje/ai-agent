@@ -3,6 +3,7 @@ package prj.anhzxje.aiagent.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import prj.anhzxje.aiagent.entity.User;
+import prj.anhzxje.aiagent.enums.Role;
 
 import java.util.Optional;
 
@@ -26,4 +27,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     /** Lấy toàn bộ danh sách người dùng sắp xếp theo ngày tạo mới nhất (cho Admin) */
     java.util.List<User> findAllByOrderByCreatedAtDesc();
+
+    /** Đếm số lượng người dùng theo vai trò phân quyền */
+    long countByRole(Role role);
 }

@@ -41,6 +41,9 @@ public class ChatConversation {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    /**
+     * Callback JPA tự động làm mới thời điểm updatedAt khi có tin nhắn mới hoặc cập nhật tiêu đề hội thoại.
+     */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();

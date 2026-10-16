@@ -52,6 +52,15 @@ class AdminControllerSecurityAndManagementTest {
     private AgentTaskRepository agentTaskRepository;
 
     @Mock
+    private prj.anhzxje.aiagent.repository.ChatConversationRepository chatConversationRepository;
+
+    @Mock
+    private prj.anhzxje.aiagent.repository.ChatMessageRepository chatMessageRepository;
+
+    @Mock
+    private prj.anhzxje.aiagent.repository.UserPreferencesRepository userPreferencesRepository;
+
+    @Mock
     private AuditLogService auditLogService;
 
     @Mock
@@ -198,5 +207,45 @@ class AdminControllerSecurityAndManagementTest {
         assertNotNull(errorsRes.getBody());
         assertEquals(1, errorsRes.getBody().size());
         assertEquals("OutOfMemory simulated error", errorsRes.getBody().get(0).getErrorMessage());
+    }
+
+    @Test
+    void testGetStats_Success() {
+        when(userRepository.count()).thenReturn(10L);
+        when(userRepository.countByRole(Role.ADMIN)).thenReturn(2L);
+        when(projectRepository.count()).thenReturn(5L);
+        when(agentTaskRepository.count()).thenReturn(20L);
+        when(agentTaskRepository.countByStatus(JobStatus.COMPLETED)).thenReturn(15L);
+        when(agentTaskRepository.countByStatusIn(any())).thenReturn(3L);
+        when(agentTaskRepository.countByStatus(JobStatus.ERROR)).thenReturn(2L);
+        when(agentTaskRepository.countByType(TaskType.CODE_REVIEW)).thenReturn(14L);
+        when(agentTaskRepository.countByType(TaskType.CODE_FIX)).thenReturn(4L);
+        when(agentTaskRepository.countByType(TaskType.TEST_GENERATION)).thenReturn(2L);
+
+        ResponseEntity<AdminStatsResponse> response = adminController.getStats();
+
+        assertNotNull(response.getBody());
+        assertEquals(10L, response.getBody().getTotalUsers());
+        assertEquals(2L, response.getBody().getTotalAdmins());
+        assertEquals(8L, response.getBody().getTotalRegularUsers());
+        assertEquals(5L, response.getBody().getTotalProjects());
+        assertEquals(20L, response.getBody().getTotalTasks());
+        assertEquals(15L, response.getBody().getCompletedTasks());
+    }
+
+    @Test
+    void testDeleteUser_SuccessWithCascade() {
+        when(userRepository.findById(2L)).thenReturn(Optional.of(regularUser));
+        when(agentTaskRepository.findByUserId(2L)).thenReturn(List.of());
+        when(chatConversationRepository.findByUserIdOrderByUpdatedAtDesc(2L)).thenReturn(List.of());
+        when(projectRepository.findByUserId(2L)).thenReturn(List.of());
+
+        ResponseEntity<?> response = adminController.deleteUser(2L, adminUserDetails);
+
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCode().value());
+        verify(userRepository, times(1)).delete(regularUser);
+        verify(userPreferencesRepository, times(1)).deleteByUserId(2L);
+        verify(auditLogService, times(1)).log(eq("admin"), eq("DELETE_USER"), anyString());
     }
 }

@@ -132,6 +132,12 @@ public class ToolManagerService {
         return tools;
     }
 
+    /**
+     * Chuyển đổi thực thể cấu hình công cụ AgentToolConfig sang DTO AgentToolDto.
+     *
+     * @param entity thực thể AgentToolConfig nguồn
+     * @return AgentToolDto DTO
+     */
     private AgentToolDto toDto(AgentToolConfig entity) {
         return AgentToolDto.builder()
                 .toolName(entity.getToolName())

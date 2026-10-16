@@ -32,7 +32,10 @@ public class AgentTaskController {
     private final AgentTaskService agentTaskService;
 
     /**
-     * Khởi tạo tác vụ AI mới và kích hoạt worker chạy ngầm.
+     * Khởi tạo tác vụ AI mới (Review, Fix, Generate Test) và kích hoạt worker chạy ngầm trên ThreadPool riêng.
+     *
+     * @param request thông tin cấu hình tác vụ gồm projectId, taskType, input JSON, model và danh sách tools
+     * @return ResponseEntity chứa thông tin AgentTaskResponse với status ban đầu là PENDING (HTTP 201 Created)
      */
     @PostMapping
     public ResponseEntity<AgentTaskResponse> createTask(
@@ -41,32 +44,57 @@ public class AgentTaskController {
                 .body(agentTaskService.createTask(request));
     }
 
+    /**
+     * Lấy thông tin chi tiết của một tác vụ theo ID (trạng thái, kết quả output JSON, nhật ký lỗi).
+     * Yêu cầu bảo mật: Chỉ chủ sở hữu tác vụ mới được phép truy xuất.
+     *
+     * @param id mã định danh tác vụ
+     * @return ResponseEntity chứa thông tin chi tiết AgentTaskResponse
+     */
     @GetMapping("/{id}")
     public ResponseEntity<AgentTaskResponse> getTask(@PathVariable Long id) {
         return ResponseEntity.ok(agentTaskService.getTask(id));
     }
 
     /**
-     * Xem kết quả và lịch sử: CHỈ THẤY TASK CỦA CHÍNH MÌNH (lọc theo userId ở backend).
+     * Lấy danh sách toàn bộ tác vụ của người dùng đang đăng nhập (sắp xếp giảm dần theo thời gian tạo).
+     * Đảm bảo tính cô lập dữ liệu (Multi-tenant): Chỉ trả về các task thuộc sở hữu của chính user hiện tại.
+     *
+     * @return ResponseEntity chứa danh sách AgentTaskResponse của user
      */
     @GetMapping
     public ResponseEntity<List<AgentTaskResponse>> getMyTasks() {
         return ResponseEntity.ok(agentTaskService.getMyTasks());
     }
 
+    /**
+     * Lấy danh sách các tác vụ thuộc một dự án cụ thể của người dùng đang đăng nhập.
+     *
+     * @param projectId mã định danh dự án cần lọc tác vụ
+     * @return ResponseEntity chứa danh sách AgentTaskResponse thuộc dự án
+     */
     @GetMapping("/project/{projectId}")
     public ResponseEntity<List<AgentTaskResponse>> getTasksByProject(
             @PathVariable Long projectId) {
         return ResponseEntity.ok(agentTaskService.getTasksByProject(projectId));
     }
 
+    /**
+     * Đảo ngược trạng thái Ghim / Bỏ ghim (Pinned) của tác vụ lên đầu giao diện.
+     *
+     * @param id mã định danh tác vụ cần ghim/bỏ ghim
+     * @return ResponseEntity chứa AgentTaskResponse với trạng thái isPinned mới
+     */
     @PatchMapping("/{id}/pin")
     public ResponseEntity<AgentTaskResponse> togglePin(@PathVariable Long id) {
         return ResponseEntity.ok(agentTaskService.togglePin(id));
     }
 
     /**
-     * Hủy task của chính mình khi đang ở trạng thái PENDING hoặc PROCESSING.
+     * Hủy bỏ tác vụ AI của chính mình khi đang ở trạng thái PENDING hoặc PROCESSING.
+     *
+     * @param id mã định danh tác vụ cần hủy
+     * @return ResponseEntity chứa AgentTaskResponse với trạng thái CANCELLED
      */
     @PostMapping("/{id}/cancel")
     public ResponseEntity<AgentTaskResponse> cancelTask(@PathVariable Long id) {
@@ -74,7 +102,10 @@ public class AgentTaskController {
     }
 
     /**
-     * Xóa 1 task của chính mình.
+     * Xóa vĩnh viễn một tác vụ của chính mình khỏi cơ sở dữ liệu.
+     *
+     * @param id mã định danh tác vụ cần xóa
+     * @return ResponseEntity chứa thông điệp xác nhận đã xóa thành công
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, String>> deleteTask(@PathVariable Long id) {
@@ -83,7 +114,9 @@ public class AgentTaskController {
     }
 
     /**
-     * Xóa toàn bộ lịch sử task của chính mình.
+     * Xóa toàn bộ lịch sử tác vụ thuộc sở hữu của người dùng đang đăng nhập.
+     *
+     * @return ResponseEntity chứa thông điệp xác nhận đã xóa toàn bộ lịch sử
      */
     @DeleteMapping
     public ResponseEntity<Map<String, String>> deleteAllMyTasks() {
@@ -92,7 +125,10 @@ public class AgentTaskController {
     }
 
     /**
-     * Chạy lại task cũ (retry).
+     * Thực thi lại một tác vụ cũ (Retry) với cấu hình và mã nguồn tương tự.
+     *
+     * @param id mã định danh tác vụ cần chạy lại
+     * @return ResponseEntity chứa thông tin AgentTaskResponse được khởi động lại (status PENDING)
      */
     @PostMapping("/{id}/retry")
     public ResponseEntity<AgentTaskResponse> retryTask(@PathVariable Long id) {

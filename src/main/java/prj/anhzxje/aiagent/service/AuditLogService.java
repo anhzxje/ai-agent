@@ -28,6 +28,10 @@ public class AuditLogService {
 
     /**
      * Ghi nhật ký kiểm toán cơ bản (không kèm IP client).
+     *
+     * @param username tên tài khoản người thực hiện hành động
+     * @param action   mã hành động nghiệp vụ (LOGIN, REGISTER, CREATE_TASK, UPDATE_ROLE, ...)
+     * @param details  chi tiết mô tả nội dung hành động
      */
     @Transactional
     public void log(String username, String action, String details) {
@@ -40,6 +44,11 @@ public class AuditLogService {
      * Khối try-catch bao bọc việc lưu AuditLog để đảm bảo rằng nếu quá trình ghi log gặp sự cố
      * (ví dụ: lỗi kết nối tạm thời, chuỗi chi tiết quá dài...), lỗi này sẽ KHÔNG làm văng ngoại lệ
      * khiến giao dịch chính của người dùng (Đăng ký, Đăng nhập, Tạo Task...) bị rollback ngoài ý muốn.
+     *
+     * @param username  tên tài khoản người thực hiện hành động
+     * @param action    mã hành động nghiệp vụ
+     * @param details   chi tiết mô tả nội dung hành động
+     * @param ipAddress địa chỉ IP của client gửi yêu cầu (có thể null)
      */
     @Transactional
     public void log(String username, String action, String details, String ipAddress) {
@@ -63,7 +72,9 @@ public class AuditLogService {
     }
 
     /**
-     * Lấy danh sách 100 nhật ký kiểm toán mới nhất phục vụ màn hình Admin.
+     * Lấy danh sách 100 nhật ký kiểm toán mới nhất phục vụ màn hình Quản trị viên (Admin Audit Log).
+     *
+     * @return danh sách AuditLogResponse gần đây nhất
      */
     @Transactional(readOnly = true)
     public List<AuditLogResponse> getRecentLogs() {
@@ -72,6 +83,12 @@ public class AuditLogService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Chuyển đổi thực thể AuditLog sang DTO AuditLogResponse.
+     *
+     * @param log thực thể AuditLog nguồn
+     * @return AuditLogResponse DTO
+     */
     private AuditLogResponse toResponse(AuditLog log) {
         return AuditLogResponse.builder()
                 .id(log.getId())

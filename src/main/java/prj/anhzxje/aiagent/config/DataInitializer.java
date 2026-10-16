@@ -36,10 +36,25 @@ public class DataInitializer implements CommandLineRunner {
     private final SystemSettingRepository systemSettingRepository;
     private final AuditLogService auditLogService;
 
+    /**
+     * Constructor phục vụ kiểm thử đơn vị hoặc khi chỉ cần khởi tạo User và PasswordEncoder.
+     *
+     * @param userRepository  repository quản lý người dùng
+     * @param passwordEncoder thuật toán mã hóa mật khẩu BCrypt
+     */
     public DataInitializer(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this(userRepository, passwordEncoder, null, null, null);
     }
 
+    /**
+     * Constructor đầy đủ được Spring Boot tiêm phụ thuộc tự động (@Autowired).
+     *
+     * @param userRepository          repository quản lý người dùng
+     * @param passwordEncoder         thuật toán mã hóa mật khẩu BCrypt
+     * @param toolConfigRepository    repository quản lý cấu hình công cụ Agent
+     * @param systemSettingRepository repository quản lý cấu hình hệ thống
+     * @param auditLogService         dịch vụ ghi nhật ký kiểm toán hệ thống
+     */
     @Autowired
     public DataInitializer(UserRepository userRepository,
                            PasswordEncoder passwordEncoder,
@@ -63,6 +78,9 @@ public class DataInitializer implements CommandLineRunner {
         initDefaultSettings();
     }
 
+    /**
+     * Khởi tạo tài khoản quản trị viên mặc định (admin/admin với ROLE_ADMIN) nếu chưa tồn tại trong CSDL.
+     */
     private void initAdminUser() {
         if (!userRepository.existsByUsername("admin")) {
             User admin = User.builder()
@@ -80,6 +98,9 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    /**
+     * Khởi tạo danh mục các công cụ mặc định của AI Agent (list_directory, glob, file_system, grep) vào CSDL nếu chưa có.
+     */
     private void initDefaultTools() {
         if (toolConfigRepository == null) return;
 
@@ -126,6 +147,9 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    /**
+     * Khởi tạo các cấu hình hệ thống mặc định (Model AI đang kích hoạt và danh sách model được phép sử dụng).
+     */
     private void initDefaultSettings() {
         if (systemSettingRepository == null) return;
 

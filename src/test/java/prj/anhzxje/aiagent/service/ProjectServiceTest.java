@@ -39,6 +39,9 @@ class ProjectServiceTest {
     @Mock
     private ProjectRepository projectRepository;
 
+    @Mock
+    private prj.anhzxje.aiagent.repository.AgentTaskRepository agentTaskRepository;
+
     @InjectMocks
     private ProjectService projectService;
 
@@ -162,8 +165,20 @@ class ProjectServiceTest {
     @Test
     void testDeleteProject_Success() {
         when(projectRepository.findById(10L)).thenReturn(Optional.of(sampleProject));
+        when(agentTaskRepository.findByProjectId(10L)).thenReturn(List.of());
 
         assertDoesNotThrow(() -> projectService.deleteProject(10L));
+        verify(projectRepository).delete(sampleProject);
+    }
+
+    @Test
+    void testDeleteProject_WithTasks_CascadeDeleteTasks() {
+        prj.anhzxje.aiagent.entity.AgentTask task = prj.anhzxje.aiagent.entity.AgentTask.builder().id(100L).build();
+        when(projectRepository.findById(10L)).thenReturn(Optional.of(sampleProject));
+        when(agentTaskRepository.findByProjectId(10L)).thenReturn(List.of(task));
+
+        assertDoesNotThrow(() -> projectService.deleteProject(10L));
+        verify(agentTaskRepository).deleteAll(List.of(task));
         verify(projectRepository).delete(sampleProject);
     }
 }

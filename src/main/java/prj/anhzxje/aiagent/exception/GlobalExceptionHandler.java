@@ -1,6 +1,8 @@
 package prj.anhzxje.aiagent.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,8 +20,10 @@ import java.time.LocalDateTime;
  * - 401 Unauthorized: Sai thông tin đăng nhập hoặc chưa truyền Bearer Token.
  * - 403 Forbidden: Không có quyền truy cập (AccessDeniedException, tài khoản bị khóa).
  * - 400 Bad Request: Dữ liệu đầu vào không hợp lệ (MethodArgumentNotValidException, IllegalArgumentException).
- * - 500 Internal Server Error: Các lỗi ngoại lệ chưa lường trước.
+ * - 409 Conflict: Lỗi xung đột hoặc ràng buộc dữ liệu (DataIntegrityViolationException).
+ * - 500 Internal Server Error: Các lỗi ngoại lệ chưa lường trước (che giấu thông tin nội bộ).
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -154,14 +158,33 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Xử lý lỗi vi phạm ràng buộc dữ liệu toàn vẹn hoặc trùng lặp bản ghi (409 Conflict).
+     * Phát sinh khi vi phạm khóa ngoại, ràng buộc unique trong CSDL MySQL.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(
+            DataIntegrityViolationException ex,
+            HttpServletRequest request) {
+        log.warn("Lỗi vi phạm ràng buộc dữ liệu tại {}: {}", request.getRequestURI(), ex.getMessage());
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .status(HttpStatus.CONFLICT.value())
+                .message("Thao tác không thể hoàn tất do vi phạm ràng buộc dữ liệu hoặc trùng lặp bản ghi.")
+                .path(request.getRequestURI())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    /**
      * Bắt tất cả các ngoại lệ hệ thống còn lại chưa được phân loại cụ thể (500 Internal Server Error).
-     * Giúp hệ thống không làm lộ StackTrace nguy hiểm ra bên ngoài.
+     * Che giấu thông tin kỹ thuật nội bộ (StackTrace, SQL Schema) để tránh lỗ hổng Information Disclosure.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex, HttpServletRequest request) {
+        log.error("Lỗi hệ thống chưa phân loại tại {}: {}", request.getRequestURI(), ex.getMessage(), ex);
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .message(ex.getMessage())
+                .message("Đã xảy ra lỗi nội bộ trên hệ thống. Vui lòng thử lại sau hoặc liên hệ quản trị viên.")
                 .path(request.getRequestURI())
                 .timestamp(LocalDateTime.now())
                 .build();

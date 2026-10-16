@@ -36,12 +36,28 @@ public class AgentTaskService {
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Constructor tiêu chuẩn (dùng trong Unit Tests hoặc khi không cần AuditLogService).
+     *
+     * @param agentTaskRepository repository quản lý entity AgentTask
+     * @param projectRepository   repository quản lý entity Project
+     * @param agentTaskExecutor   thành phần thực thi tác vụ bất đồng bộ
+     */
     public AgentTaskService(AgentTaskRepository agentTaskRepository,
                             ProjectRepository projectRepository,
                             AgentTaskExecutor agentTaskExecutor) {
         this(agentTaskRepository, projectRepository, agentTaskExecutor, null, new ObjectMapper());
     }
 
+    /**
+     * Constructor đầy đủ được Spring Boot tiêm phụ thuộc tự động (@Autowired).
+     *
+     * @param agentTaskRepository repository quản lý entity AgentTask
+     * @param projectRepository   repository quản lý entity Project
+     * @param agentTaskExecutor   thành phần thực thi tác vụ bất đồng bộ
+     * @param auditLogService     service ghi nhật ký kiểm toán hệ thống (tùy chọn)
+     * @param objectMapper        bộ chuyển đổi Jackson ObjectMapper (tùy chọn)
+     */
     @org.springframework.beans.factory.annotation.Autowired
     public AgentTaskService(AgentTaskRepository agentTaskRepository,
                             ProjectRepository projectRepository,
@@ -269,6 +285,14 @@ public class AgentTaskService {
     // Helpers
     // ────────────────────────────────────────────────
 
+    /**
+     * Tra cứu tác vụ theo ID và xác minh quyền sở hữu của người dùng hiện tại.
+     * Chống tấn công IDOR: ném ngoại lệ ResourceNotFoundException nếu task không tồn tại hoặc thuộc người khác.
+     *
+     * @param taskId mã định danh tác vụ
+     * @return thực thể AgentTask nếu hợp lệ
+     * @throws ResourceNotFoundException nếu không tìm thấy hoặc không thuộc quyền sở hữu
+     */
     private AgentTask findTaskAndVerifyOwner(Long taskId) {
         User currentUser = getCurrentUser();
         AgentTask task = agentTaskRepository.findById(taskId)
@@ -282,12 +306,23 @@ public class AgentTaskService {
         return task;
     }
 
+    /**
+     * Lấy thông tin thực thể User đang đăng nhập từ SecurityContextHolder của Spring Security.
+     *
+     * @return thực thể User hiện tại
+     */
     private User getCurrentUser() {
         CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder
                 .getContext().getAuthentication().getPrincipal();
         return userDetails.getUser();
     }
 
+    /**
+     * Chuyển đổi thực thể AgentTask sang DTO AgentTaskResponse để trả về cho Client.
+     *
+     * @param task thực thể AgentTask nguồn
+     * @return AgentTaskResponse DTO
+     */
     private AgentTaskResponse toResponse(AgentTask task) {
         return AgentTaskResponse.builder()
                 .id(task.getId())

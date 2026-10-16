@@ -46,6 +46,9 @@ public class Project {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    /**
+     * Callback JPA tự động làm mới thời điểm updatedAt khi có thay đổi thông tin dự án.
+     */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();

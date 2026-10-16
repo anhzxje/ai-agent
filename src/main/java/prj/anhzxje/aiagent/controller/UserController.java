@@ -35,7 +35,10 @@ public class UserController {
     private final AuditLogService auditLogService;
 
     /**
-     * Lấy thông tin cá nhân của chính mình.
+     * Lấy thông tin hồ sơ cá nhân của người dùng đang đăng nhập (gồm thông tin tài khoản và tùy chọn giao diện/model).
+     *
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa UserProfileResponse với đầy đủ thông tin tài khoản
      */
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> getMyProfile(@AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -64,6 +67,10 @@ public class UserController {
      * - Bước 4: Kiểm tra chống đặt lại mật khẩu cũ (mật khẩu mới không được giống mật khẩu hiện tại).
      * - Bước 5: Băm mật khẩu mới bằng BCrypt và cập nhật vào CSDL.
      * - Bước 6: Ghi nhật ký kiểm toán (AuditLog) hành vi đổi mật khẩu thành công.
+     *
+     * @param request     chứa currentPassword, newPassword và confirmPassword
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa thông điệp đổi mật khẩu thành công
      */
     @PutMapping("/me/password")
     public ResponseEntity<Map<String, String>> changePassword(
@@ -99,6 +106,13 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công"));
     }
 
+    /**
+     * Alias endpoint cho thao tác đổi mật khẩu (hỗ trợ các client gọi qua POST /api/users/change-password).
+     *
+     * @param request     chứa mật khẩu hiện tại và mật khẩu mới
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa thông điệp thành công
+     */
     @PostMapping("/change-password")
     public ResponseEntity<Map<String, String>> changePasswordAlias(
             @Valid @RequestBody ChangePasswordRequest request,
@@ -107,13 +121,24 @@ public class UserController {
     }
 
     /**
-     * Cài đặt cá nhân nhẹ: ngôn ngữ, giao diện sáng/tối, model ưa thích.
+     * Lấy cấu hình tùy chọn cá nhân hiện tại của người dùng (ngôn ngữ vi/en, theme dark/light, model AI ưa thích).
+     *
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa UserPreferencesResponse
      */
     @GetMapping("/me/preferences")
     public ResponseEntity<UserPreferencesResponse> getPreferences(@AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(userPreferencesService.getPreferences(userDetails.getUser()));
     }
 
+    /**
+     * Cập nhật tùy chọn cá nhân của người dùng (ngôn ngữ, theme, model Gemini ưa thích).
+     * Ràng buộc: model phải thuộc danh sách allowedModels do Admin quy định.
+     *
+     * @param request     chứa cấu hình tùy chọn mới
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa UserPreferencesResponse sau khi đã lưu
+     */
     @PutMapping("/me/preferences")
     public ResponseEntity<UserPreferencesResponse> updatePreferences(
             @RequestBody UserPreferencesRequest request,

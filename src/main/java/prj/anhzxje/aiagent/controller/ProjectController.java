@@ -24,7 +24,10 @@ public class ProjectController {
     private final ProjectService projectService;
 
     /**
-     * Lấy danh sách tất cả dự án thuộc quyền sở hữu của người dùng hiện tại.
+     * Lấy danh sách tất cả các dự án mã nguồn thuộc quyền sở hữu của người dùng đang đăng nhập.
+     * Sắp xếp giảm dần theo thời gian tạo mới nhất.
+     *
+     * @return ResponseEntity chứa danh sách ProjectResponse
      */
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> getMyProjects() {
@@ -32,7 +35,11 @@ public class ProjectController {
     }
 
     /**
-     * Lấy thông tin chi tiết một dự án theo ID (kiểm tra quyền sở hữu).
+     * Lấy thông tin chi tiết một dự án mã nguồn theo ID.
+     * Yêu cầu bảo mật: Chỉ cho phép truy xuất nếu dự án thuộc quyền sở hữu của user hiện tại (chống IDOR).
+     *
+     * @param id mã định danh dự án
+     * @return ResponseEntity chứa thông tin ProjectResponse
      */
     @GetMapping("/{id}")
     public ResponseEntity<ProjectResponse> getProject(@PathVariable Long id) {
@@ -40,7 +47,11 @@ public class ProjectController {
     }
 
     /**
-     * Tạo mới một dự án mã nguồn.
+     * Đăng ký tạo mới một dự án mã nguồn vào hệ thống.
+     * Tự động liên kết quyền sở hữu với tài khoản người dùng đang đăng nhập.
+     *
+     * @param request dữ liệu khởi tạo dự án gồm tên, mô tả, đường dẫn thư mục mã nguồn và ngôn ngữ
+     * @return ResponseEntity chứa ProjectResponse vừa tạo (HTTP 201 Created)
      */
     @PostMapping
     public ResponseEntity<ProjectResponse> createProject(
@@ -50,7 +61,11 @@ public class ProjectController {
     }
 
     /**
-     * Cập nhật thông tin dự án (tên, đường dẫn thư mục, ngôn ngữ, mô tả).
+     * Cập nhật thông tin dự án hiện có (tên dự án, đường dẫn thư mục, ngôn ngữ lập trình, mô tả).
+     *
+     * @param id      mã định danh dự án cần cập nhật
+     * @param request dữ liệu cập nhật dự án mới
+     * @return ResponseEntity chứa ProjectResponse sau khi đã lưu
      */
     @PutMapping("/{id}")
     public ResponseEntity<ProjectResponse> updateProject(
@@ -60,7 +75,10 @@ public class ProjectController {
     }
 
     /**
-     * Xóa dự án và các tác vụ liên quan.
+     * Xóa vĩnh viễn dự án mã nguồn khỏi hệ thống.
+     *
+     * @param id mã định danh dự án cần xóa
+     * @return ResponseEntity trả về HTTP 204 No Content
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProject(@PathVariable Long id) {

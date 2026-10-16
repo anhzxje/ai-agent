@@ -28,7 +28,11 @@ public class SystemController {
     private final ToolManagerService toolManagerService;
 
     /**
-     * Danh sách model AI mà người dùng được phép chọn (được quy định bởi Admin).
+     * Lấy cấu hình các mô hình AI khả dụng cho người dùng lựa chọn:
+     * - activeModel: Tên mô hình AI mặc định đang kích hoạt trong hệ thống
+     * - allowedModels: Danh sách các mô hình mà Quản trị viên cho phép người dùng chọn
+     *
+     * @return ResponseEntity chứa Map với activeModel và allowedModels
      */
     @GetMapping("/models")
     public ResponseEntity<Map<String, Object>> getAllowedModels() {
@@ -39,7 +43,10 @@ public class SystemController {
     }
 
     /**
-     * Danh sách công cụ khả dụng mà người dùng được phép sử dụng (chỉ các tool đang được Admin BẬT).
+     * Lấy danh sách các công cụ (Agent Tools) đang được Quản trị viên BẬT (enabled = true) trong hệ thống.
+     * Người dùng chỉ được phép chọn và kích hoạt các công cụ nằm trong danh sách này.
+     *
+     * @return ResponseEntity chứa danh sách AgentToolDto khả dụng
      */
     @GetMapping("/tools")
     public ResponseEntity<List<AgentToolDto>> getAvailableTools() {

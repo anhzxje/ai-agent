@@ -70,7 +70,8 @@ class CodeReviewAgentTest {
 
         assertNull(ReflectionTestUtils.invokeMethod(agent, "cleanJsonResponse", (String) null));
         assertEquals("{\"a\":1}", ReflectionTestUtils.invokeMethod(agent, "cleanJsonResponse", "```json\n{\"a\":1}\n```"));
-        assertEquals("{\"a\":1}", ReflectionTestUtils.invokeMethod(agent, "cleanJsonResponse", "```\n{\"a\":1}\n```"));
+        assertEquals("{\"a\":1}", ReflectionTestUtils.invokeMethod(agent, "cleanJsonResponse", "Dưới đây là kết quả:\n```json\n{\"a\":1}\n```\nChúc bạn thành công!"));
+        assertEquals("{\"a\":1}", ReflectionTestUtils.invokeMethod(agent, "cleanJsonResponse", "Here is JSON: {\"a\":1} hope it helps"));
         assertEquals("{\"a\":1}", ReflectionTestUtils.invokeMethod(agent, "cleanJsonResponse", "{\"a\":1}"));
     }
 }

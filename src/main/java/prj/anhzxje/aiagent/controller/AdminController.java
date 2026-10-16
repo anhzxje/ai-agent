@@ -10,6 +10,7 @@ import prj.anhzxje.aiagent.dto.admin.*;
 import prj.anhzxje.aiagent.dto.project.ProjectResponse;
 import prj.anhzxje.aiagent.dto.task.AgentTaskResponse;
 import prj.anhzxje.aiagent.entity.AgentTask;
+import prj.anhzxje.aiagent.entity.ChatConversation;
 import prj.anhzxje.aiagent.entity.Project;
 import prj.anhzxje.aiagent.entity.User;
 import prj.anhzxje.aiagent.enums.JobStatus;
@@ -17,7 +18,10 @@ import prj.anhzxje.aiagent.enums.Role;
 import prj.anhzxje.aiagent.enums.TaskType;
 import prj.anhzxje.aiagent.exception.ResourceNotFoundException;
 import prj.anhzxje.aiagent.repository.AgentTaskRepository;
+import prj.anhzxje.aiagent.repository.ChatConversationRepository;
+import prj.anhzxje.aiagent.repository.ChatMessageRepository;
 import prj.anhzxje.aiagent.repository.ProjectRepository;
+import prj.anhzxje.aiagent.repository.UserPreferencesRepository;
 import prj.anhzxje.aiagent.repository.UserRepository;
 import prj.anhzxje.aiagent.security.CustomUserDetails;
 import prj.anhzxje.aiagent.service.AuditLogService;
@@ -50,36 +54,35 @@ public class AdminController {
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
     private final AgentTaskRepository agentTaskRepository;
+    private final ChatConversationRepository chatConversationRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final UserPreferencesRepository userPreferencesRepository;
     private final AuditLogService auditLogService;
     private final ToolManagerService toolManagerService;
     private final SystemConfigService systemConfigService;
 
     /**
      * Lấy dữ liệu thống kê tổng quan toàn hệ thống cho Dashboard Admin.
-     * Bao gồm: tổng người dùng, admin, dự án, tác vụ AI, trạng thái tác vụ và phân loại tác vụ.
+     * Sử dụng các câu lệnh count() trực tiếp từ CSDL để tránh tràn RAM (OutOfMemory) khi hệ thống có nhiều tác vụ.
      *
      * @return ResponseEntity chứa AdminStatsResponse với đầy đủ các chỉ số thống kê
      */
     @GetMapping("/stats")
     public ResponseEntity<AdminStatsResponse> getStats() {
-        List<User> allUsers = userRepository.findAll();
-        List<AgentTask> allTasks = agentTaskRepository.findAll();
-        long totalUsers = allUsers.size();
+        long totalUsers = userRepository.count();
         long totalProjects = projectRepository.count();
-        long totalTasks = allTasks.size();
+        long totalTasks = agentTaskRepository.count();
 
-        long totalAdmins = allUsers.stream().filter(u -> u.getRole() == Role.ADMIN).count();
-        long totalRegularUsers = totalUsers - totalAdmins;
+        long totalAdmins = userRepository.countByRole(Role.ADMIN);
+        long totalRegularUsers = Math.max(0, totalUsers - totalAdmins);
 
-        long completedTasks = allTasks.stream().filter(t -> t.getStatus() == JobStatus.COMPLETED).count();
-        long pendingOrProcessingTasks = allTasks.stream()
-                .filter(t -> t.getStatus() == JobStatus.PENDING || t.getStatus() == JobStatus.PROCESSING).count();
-        long failedTasks = allTasks.stream()
-                .filter(t -> t.getStatus() == JobStatus.ERROR).count();
+        long completedTasks = agentTaskRepository.countByStatus(JobStatus.COMPLETED);
+        long pendingOrProcessingTasks = agentTaskRepository.countByStatusIn(List.of(JobStatus.PENDING, JobStatus.PROCESSING));
+        long failedTasks = agentTaskRepository.countByStatus(JobStatus.ERROR);
 
-        long reviewTasksCount = allTasks.stream().filter(t -> t.getType() == TaskType.CODE_REVIEW).count();
-        long fixTasksCount = allTasks.stream().filter(t -> t.getType() == TaskType.CODE_FIX).count();
-        long testGenTasksCount = allTasks.stream().filter(t -> t.getType() == TaskType.TEST_GENERATION).count();
+        long reviewTasksCount = agentTaskRepository.countByType(TaskType.CODE_REVIEW);
+        long fixTasksCount = agentTaskRepository.countByType(TaskType.CODE_FIX);
+        long testGenTasksCount = agentTaskRepository.countByType(TaskType.TEST_GENERATION);
 
         return ResponseEntity.ok(AdminStatsResponse.builder()
                 .totalUsers(totalUsers)
@@ -220,16 +223,31 @@ public class AdminController {
             agentTaskRepository.deleteAll(userTasks);
         }
 
-        // Bước 2: Xóa các dự án mã nguồn liên quan
+        // Bước 2: Xóa toàn bộ tin nhắn và các cuộc hội thoại chat của user
+        List<ChatConversation> userConvs = chatConversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        for (ChatConversation conv : userConvs) {
+            chatMessageRepository.deleteByConversationId(conv.getId());
+        }
+        if (!userConvs.isEmpty()) {
+            chatConversationRepository.deleteAll(userConvs);
+        }
+
+        // Bước 3: Xóa tùy chọn cá nhân của user
+        userPreferencesRepository.deleteByUserId(userId);
+
+        // Bước 4: Xóa các dự án mã nguồn liên quan (và task con nếu có)
         List<Project> userProjects = projectRepository.findByUserId(userId);
+        for (Project p : userProjects) {
+            agentTaskRepository.deleteByProjectId(p.getId());
+        }
         if (!userProjects.isEmpty()) {
             projectRepository.deleteAll(userProjects);
         }
 
-        // Bước 3: Xóa bản ghi người dùng
+        // Bước 5: Xóa bản ghi người dùng
         userRepository.delete(target);
 
-        // Bước 4: Ghi nhật ký kiểm toán hành vi xóa tài khoản
+        // Bước 6: Ghi nhật ký kiểm toán hành vi xóa tài khoản
         auditLogService.log(adminUser != null ? adminUser.getUsername() : "ADMIN", "DELETE_USER",
                 "Đã xóa tài khoản người dùng " + target.getUsername() + " và toàn bộ dữ liệu liên quan");
 

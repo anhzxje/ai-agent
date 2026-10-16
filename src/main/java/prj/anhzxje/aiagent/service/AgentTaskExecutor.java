@@ -100,14 +100,21 @@ public class AgentTaskExecutor {
                     }
 
                     // Kiểm tra an toàn: nếu inputJson có chỉ định projectPath riêng,
-                    // bắt buộc đường dẫn đó phải nằm trong danh mục sandbox allowed-paths.
+                    // bắt buộc đường dẫn đó phải nằm trong danh mục sandbox allowed-paths
+                    // và phải thuộc phạm vi dự án hiện tại (chống IDOR / đọc lén dự án khác).
                     if (node.has("projectPath") && !node.get("projectPath").asText().isBlank()) {
                         String overridePath = node.get("projectPath").asText();
-                        if (isPathAllowed(overridePath)) {
-                            projectPath = overridePath;
-                        } else {
-                            log.warn("AgentTask [id={}]: projectPath từ input JSON bị từ chối (không nằm trong allowed-paths): {}",
-                                    taskId, overridePath);
+                        try {
+                            Path normOverride = Path.of(overridePath).toAbsolutePath().normalize();
+                            Path normBase = Path.of(projectPath).toAbsolutePath().normalize();
+                            if ((normOverride.startsWith(normBase) || normOverride.equals(normBase)) && isPathAllowed(overridePath)) {
+                                projectPath = overridePath;
+                            } else {
+                                log.warn("AgentTask [id={}]: projectPath từ input JSON bị từ chối (không thuộc dự án hoặc không nằm trong allowed-paths): {}",
+                                        taskId, overridePath);
+                            }
+                        } catch (Exception e) {
+                            log.warn("AgentTask [id={}]: Lỗi kiểm tra projectPath override: {}", taskId, e.getMessage());
                         }
                     }
                 } catch (Exception e) {
@@ -185,6 +192,14 @@ public class AgentTaskExecutor {
         };
     }
 
+    /**
+     * Dispatch task tới agent với cấu hình cơ bản (không chỉ định custom tools hoặc custom model).
+     *
+     * @param taskType    loại tác vụ cần thực hiện (CODE_REVIEW, CODE_FIX, CODE_EXPLAIN, TEST_GENERATION)
+     * @param projectPath đường dẫn thư mục dự án
+     * @param focus       trọng tâm phân tích (security, performance, bug, code_quality, hoặc null)
+     * @return kết quả trả về từ Agent dưới dạng chuỗi JSON
+     */
     private String dispatchTask(TaskType taskType, String projectPath, String focus) {
         return switch (taskType) {
             case CODE_REVIEW -> codeReviewAgent.reviewPath(projectPath, focus);

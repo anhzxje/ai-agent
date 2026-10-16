@@ -37,6 +37,9 @@ public class SystemSetting {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    /**
+     * Callback JPA tự động làm mới thời điểm updatedAt khi có sự thay đổi giá trị cấu hình hệ thống.
+     */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();

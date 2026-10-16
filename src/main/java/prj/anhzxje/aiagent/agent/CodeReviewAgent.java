@@ -56,10 +56,23 @@ public class CodeReviewAgent {
     private final ToolManagerService toolManagerService;
     private final SystemConfigService systemConfigService;
 
+    /**
+     * Constructor tiêu chuẩn (dùng trong Unit Tests hoặc môi trường rút gọn).
+     *
+     * @param chatClientBuilder builder để khởi tạo Spring AI ChatClient
+     */
     public CodeReviewAgent(ChatClient.Builder chatClientBuilder) {
         this(chatClientBuilder, null, null);
     }
 
+    /**
+     * Constructor đầy đủ được Spring Boot tiêm phụ thuộc (@Autowired).
+     * Khởi tạo ChatClient với System Prompt rà soát mã nguồn và cấu hình Safety Settings tối ưu.
+     *
+     * @param chatClientBuilder   builder để khởi tạo Spring AI ChatClient
+     * @param toolManagerService  service quản lý công cụ duyệt file động
+     * @param systemConfigService service cấu hình hệ thống (model AI kích hoạt)
+     */
     @org.springframework.beans.factory.annotation.Autowired
     public CodeReviewAgent(ChatClient.Builder chatClientBuilder,
                            @org.springframework.lang.Nullable ToolManagerService toolManagerService,
@@ -267,7 +280,16 @@ public class CodeReviewAgent {
         if (cleaned.endsWith("```")) {
             cleaned = cleaned.substring(0, cleaned.length() - 3);
         }
-        return cleaned.trim();
+        cleaned = cleaned.trim();
+
+        // Bóc tách chính xác từ dấu '{' đầu tiên đến dấu '}' cuối cùng để loại bỏ văn bản dạo đầu/kết thúc
+        int firstBrace = cleaned.indexOf('{');
+        int lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) {
+            return cleaned.substring(firstBrace, lastBrace + 1).trim();
+        }
+
+        return cleaned;
     }
 
     /**

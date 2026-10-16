@@ -44,6 +44,9 @@ public class UserPreferences {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    /**
+     * Callback JPA tự động làm mới thời điểm updatedAt khi có thay đổi cấu hình tùy chọn cá nhân.
+     */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();

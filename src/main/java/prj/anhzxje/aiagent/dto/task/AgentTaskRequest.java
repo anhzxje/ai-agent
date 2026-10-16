@@ -56,7 +56,21 @@ public class AgentTaskRequest {
      */
     private String prompt;
 
+    /**
+     * Bộ giải tuần tự hóa tùy biến (Custom JSON Deserializer):
+     * Linh hoạt xử lý trường `input` khi client gửi lên dưới dạng chuỗi String thuần túy
+     * HOẶC một đối tượng JSON Object lồng nhau, giúp tránh lỗi parse từ frontend/desktop.
+     */
     public static class FlexibleStringDeserializer extends JsonDeserializer<String> {
+
+        /**
+         * Chuyển đổi dữ liệu JSON đầu vào thành chuỗi String.
+         *
+         * @param p    bộ parser JSON của Jackson
+         * @param ctxt ngữ cảnh giải tuần tự hóa
+         * @return chuỗi String biểu diễn JSON hoặc null nếu rỗng
+         * @throws IOException nếu xảy ra lỗi đọc luồng JSON
+         */
         @Override
         public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
             JsonNode node = p.getCodec().readTree(p);

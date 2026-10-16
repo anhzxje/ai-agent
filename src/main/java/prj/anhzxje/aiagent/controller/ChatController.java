@@ -35,15 +35,24 @@ public class ChatController {
     private final ChatService chatService;
 
     /**
-     * Lấy danh sách các cuộc hội thoại của người dùng đang đăng nhập (lọc theo userId).
+     * Lấy danh sách các cuộc hội thoại của người dùng đang đăng nhập (sắp xếp theo thời gian cập nhật gần nhất).
+     *
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa danh sách ChatConversationResponse
      */
-
     @GetMapping("/conversations")
     public ResponseEntity<List<ChatConversationResponse>> getMyConversations(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(chatService.getMyConversations(userDetails.getUser()));
     }
 
+    /**
+     * Khởi tạo một phiên hội thoại mới với tiêu đề và mô hình AI tùy chọn.
+     *
+     * @param body        chứa thuộc tính title (tiêu đề cuộc hội thoại) và model (mô hình AI chỉ định)
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa thông tin ChatConversationResponse vừa tạo (HTTP 201 Created)
+     */
     @PostMapping("/conversations")
     public ResponseEntity<ChatConversationResponse> createConversation(
             @RequestBody(required = false) Map<String, String> body,
@@ -54,6 +63,13 @@ public class ChatController {
                 .body(chatService.createConversation(userDetails.getUser(), title, model));
     }
 
+    /**
+     * Lấy thông tin chi tiết một cuộc hội thoại kèm theo toàn bộ lịch sử tin nhắn hỏi đáp.
+     *
+     * @param id          mã định danh cuộc hội thoại
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa ChatConversationDetailResponse kèm danh sách tin nhắn
+     */
     @GetMapping("/conversations/{id}")
     public ResponseEntity<ChatConversationDetailResponse> getConversationDetail(
             @PathVariable Long id,
@@ -61,6 +77,13 @@ public class ChatController {
         return ResponseEntity.ok(chatService.getConversationDetail(id, userDetails.getUser()));
     }
 
+    /**
+     * Xóa vĩnh viễn một cuộc hội thoại và toàn bộ tin nhắn bên trong.
+     *
+     * @param id          mã định danh cuộc hội thoại cần xóa
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa thông điệp xác nhận đã xóa thành công
+     */
     @DeleteMapping("/conversations/{id}")
     public ResponseEntity<Map<String, String>> deleteConversation(
             @PathVariable Long id,
@@ -70,7 +93,12 @@ public class ChatController {
     }
 
     /**
-     * Gửi tin nhắn và nhận phản hồi từ AI Agent (tự động tạo cuộc hội thoại nếu chưa có).
+     * Gửi tin nhắn và nhận phản hồi trực tiếp từ Google Gemini AI.
+     * Tự động khởi tạo phiên hội thoại mới nếu client chưa chỉ định conversationId.
+     *
+     * @param request     chứa nội dung tin nhắn message và conversationId tùy chọn
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa tin nhắn phản hồi của AI (ChatMessageResponse)
      */
     @PostMapping
     public ResponseEntity<ChatMessageResponse> sendMessage(
@@ -79,6 +107,14 @@ public class ChatController {
         return ResponseEntity.ok(chatService.sendMessage(request, userDetails.getUser()));
     }
 
+    /**
+     * Gửi tin nhắn vào một cuộc hội thoại cụ thể đã tồn tại.
+     *
+     * @param id          mã định danh cuộc hội thoại mục tiêu
+     * @param request     chứa nội dung tin nhắn người dùng
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa tin nhắn phản hồi của AI (ChatMessageResponse)
+     */
     @PostMapping("/conversations/{id}/messages")
     public ResponseEntity<ChatMessageResponse> sendMessageInConversation(
             @PathVariable Long id,

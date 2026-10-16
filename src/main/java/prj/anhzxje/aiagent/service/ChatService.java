@@ -3,6 +3,7 @@ package prj.anhzxje.aiagent.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import prj.anhzxje.aiagent.dto.chat.ChatConversationDetailResponse;
@@ -83,17 +84,23 @@ public class ChatService {
 
     /**
      * Khởi tạo một cuộc hội thoại mới với mô hình AI đã chọn hoặc mô hình mặc định.
-     * Quy trình:
-     * - Bước 1: Xác định model sử dụng: Nếu client truyền lên model cụ thể thì dùng model đó, ngược lại lấy default model từ SystemConfigService.
-     * - Bước 2: Thiết lập tiêu đề mặc định ("Cuộc hội thoại mới") nếu client không truyền title.
-     * - Bước 3: Tạo và lưu thực thể ChatConversation vào CSDL với thời điểm tạo và cập nhật ban đầu.
-     * - Bước 4: Ghi nhật ký kiểm toán (AuditLog) về việc tạo hội thoại mới.
-     * - Bước 5: Chuyển đổi và trả về DTO ChatConversationResponse.
+     * Kiểm tra tính hợp lệ của model (phải thuộc danh sách allowedModels).
      */
     @Transactional
     public ChatConversationResponse createConversation(User user, String title, String model) {
-        // Bước 1: Xác định model AI được chọn hoặc lấy cấu hình hệ thống hiện tại
-        String activeModel = (model != null && !model.isBlank()) ? model : systemConfigService.getActiveModel();
+        // Bước 1: Xác định model AI được chọn và kiểm tra danh sách whitelist
+        String activeModel;
+        if (model != null && !model.isBlank()) {
+            String trimmedModel = model.trim();
+            List<String> allowed = systemConfigService.getAllowedModels();
+            if (!allowed.contains(trimmedModel)) {
+                throw new IllegalArgumentException("Model '" + trimmedModel + "' không nằm trong danh sách model được phép: " + allowed);
+            }
+            activeModel = trimmedModel;
+        } else {
+            activeModel = systemConfigService.getActiveModel();
+        }
+
         // Bước 2: Đặt tiêu đề cuộc trò chuyện
         String convTitle = (title != null && !title.isBlank()) ? title : "Cuộc hội thoại mới";
 
@@ -115,11 +122,6 @@ public class ChatService {
 
     /**
      * Xóa cuộc hội thoại và toàn bộ các tin nhắn liên quan (Xóa thủ công theo nguyên lý Cascade delete).
-     * Quy trình:
-     * - Bước 1: Xác thực quyền sở hữu: Kiểm tra xem user có phải chủ nhân của hội thoại này không.
-     * - Bước 2: Xóa toàn bộ tin nhắn (ChatMessage) thuộc về cuộc hội thoại này trước để tránh lỗi khóa ngoại (Foreign Key Constraint).
-     * - Bước 3: Xóa thực thể cuộc hội thoại (ChatConversation).
-     * - Bước 4: Ghi nhật ký kiểm toán hành vi xóa.
      */
     @Transactional
     public void deleteConversation(Long convId, User user) {
@@ -138,16 +140,7 @@ public class ChatService {
 
     /**
      * Gửi tin nhắn từ người dùng, gọi Google Gemini sinh phản hồi và lưu cả 2 vào CSDL.
-     * Quy trình xử lý:
-     * - Bước 1: Xác định cuộc hội thoại (ChatConversation):
-     *     + Nếu có conversationId: Kiểm tra quyền sở hữu của user.
-     *     + Nếu chưa có conversationId: Tự động khởi tạo phiên mới, cắt 35 ký tự đầu của tin nhắn làm tiêu đề.
-     * - Bước 2: Lưu ngay tin nhắn của User ("USER") vào CSDL để đảm bảo lịch sử hỏi đáp không bị mất.
-     * - Bước 3: Sử dụng Spring AI ChatClient gọi Google Gemini với System Prompt chuyên gia lập trình.
-     *     + Bắt lỗi ngoại lệ (Timeout, Quota Exceeded...) để trả về thông báo lỗi thân thiện thay vì làm sập API.
-     * - Bước 4: Lưu tin nhắn phản hồi của AI ("AGENT") vào CSDL.
-     * - Bước 5: Cập nhật trường updatedAt của hội thoại lên thời điểm hiện tại (để sắp xếp hội thoại gần nhất lên đầu).
-     * - Bước 6: Ghi nhật ký kiểm toán (AuditLog) và trả về DTO ChatMessageResponse.
+     * Tự động nạp tối đa 10 tin nhắn gần nhất để AI duy trì ngữ cảnh đa lượt (Multi-turn Context).
      */
     @Transactional
     public ChatMessageResponse sendMessage(ChatMessageRequest request, User user) {
@@ -169,7 +162,10 @@ public class ChatService {
                     .build());
         }
 
-        // Bước 2: Lưu tin nhắn của Người dùng (USER) vào CSDL
+        // Bước 2: Lấy lịch sử tin nhắn trước đó để giữ ngữ cảnh hội thoại đa lượt
+        List<ChatMessage> previousMessages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conv.getId());
+
+        // Bước 3: Lưu tin nhắn của Người dùng (USER) vào CSDL
         ChatMessage userMsg = ChatMessage.builder()
                 .conversation(conv)
                 .sender("USER")
@@ -178,15 +174,37 @@ public class ChatService {
                 .build();
         messageRepository.save(userMsg);
 
-        // Bước 3: Khởi tạo ChatClient và gọi API Google Gemini
+        // Bước 4: Xây dựng Prompt kèm ngữ cảnh đa lượt (lấy tối đa 10 tin nhắn gần nhất)
+        StringBuilder promptWithContext = new StringBuilder();
+        if (!previousMessages.isEmpty()) {
+            promptWithContext.append("Đây là lịch sử trao đổi trước đó giữa bạn và người dùng:\n---\n");
+            int startIdx = Math.max(0, previousMessages.size() - 10);
+            for (int i = startIdx; i < previousMessages.size(); i++) {
+                ChatMessage m = previousMessages.get(i);
+                String senderLabel = "USER".equalsIgnoreCase(m.getSender()) ? "Người dùng" : "Trợ lý AI";
+                promptWithContext.append(senderLabel).append(": ").append(m.getContent()).append("\n\n");
+            }
+            promptWithContext.append("---\nCâu hỏi/Yêu cầu hiện tại của người dùng:\n");
+        }
+        promptWithContext.append(request.getMessage());
+
+        // Bước 5: Khởi tạo ChatClient và gọi API Google Gemini với model của cuộc hội thoại
+        String chatModel = (conv.getModel() != null && !conv.getModel().isBlank())
+                ? conv.getModel()
+                : systemConfigService.getActiveModel();
+
         String aiResponseText;
         try {
-            aiResponseText = chatClientBuilder.build()
+            var promptSpec = chatClientBuilder.build()
                     .prompt()
                     .system(CHAT_SYSTEM_PROMPT)
-                    .user(request.getMessage())
-                    .call()
-                    .content();
+                    .user(promptWithContext.toString());
+
+            if (chatModel != null && !chatModel.isBlank()) {
+                promptSpec.options(GoogleGenAiChatOptions.builder().model(chatModel));
+            }
+
+            aiResponseText = promptSpec.call().content();
 
             // Đảm bảo không trả về chuỗi rỗng nếu AI phản hồi trống
             if (aiResponseText == null || aiResponseText.isBlank()) {
@@ -198,7 +216,7 @@ public class ChatService {
             aiResponseText = "Đã xảy ra lỗi khi trao đổi với AI: " + e.getMessage();
         }
 
-        // Bước 4: Lưu tin nhắn phản hồi của AI Agent (AGENT) vào CSDL
+        // Bước 6: Lưu tin nhắn phản hồi của AI Agent (AGENT) vào CSDL
         ChatMessage agentMsg = ChatMessage.builder()
                 .conversation(conv)
                 .sender("AGENT")
@@ -207,11 +225,11 @@ public class ChatService {
                 .build();
         ChatMessage savedAgentMsg = messageRepository.save(agentMsg);
 
-        // Bước 5: Cập nhật mốc thời gian hoạt động mới nhất cho cuộc hội thoại
+        // Bước 7: Cập nhật mốc thời gian hoạt động mới nhất cho cuộc hội thoại
         conv.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conv);
 
-        // Bước 6: Ghi nhật ký Audit Log và trả về phản hồi
+        // Bước 8: Ghi nhật ký Audit Log và trả về phản hồi
         auditLogService.log(user.getUsername(), "CHAT_MESSAGE", "Trao đổi với AI trong hội thoại #" + conv.getId());
         return toMessageResponse(savedAgentMsg);
     }
@@ -230,6 +248,12 @@ public class ChatService {
         return conv;
     }
 
+    /**
+     * Chuyển đổi thực thể ChatConversation sang DTO ChatConversationResponse tóm tắt.
+     *
+     * @param conv thực thể ChatConversation nguồn
+     * @return ChatConversationResponse DTO
+     */
     private ChatConversationResponse toConversationResponse(ChatConversation conv) {
         return ChatConversationResponse.builder()
                 .id(conv.getId())
@@ -240,6 +264,12 @@ public class ChatService {
                 .build();
     }
 
+    /**
+     * Chuyển đổi thực thể ChatMessage sang DTO ChatMessageResponse.
+     *
+     * @param msg thực thể ChatMessage nguồn
+     * @return ChatMessageResponse DTO
+     */
     private ChatMessageResponse toMessageResponse(ChatMessage msg) {
         return ChatMessageResponse.builder()
                 .id(msg.getId())

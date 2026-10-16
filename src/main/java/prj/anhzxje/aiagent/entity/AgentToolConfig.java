@@ -47,6 +47,9 @@ public class AgentToolConfig {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    /**
+     * Callback JPA tự động cập nhật mốc thời gian updatedAt trước khi thực thể được cập nhật vào CSDL.
+     */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
