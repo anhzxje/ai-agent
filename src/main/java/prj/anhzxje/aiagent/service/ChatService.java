@@ -4,6 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
+import org.springframework.ai.google.genai.common.GoogleGenAiSafetySetting;
+import org.springframework.ai.google.genai.common.GoogleGenAiSafetySetting.HarmBlockMethod;
+import org.springframework.ai.google.genai.common.GoogleGenAiSafetySetting.HarmBlockThreshold;
+import org.springframework.ai.google.genai.common.GoogleGenAiSafetySetting.HarmCategory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import prj.anhzxje.aiagent.dto.chat.ChatConversationDetailResponse;
@@ -12,10 +16,12 @@ import prj.anhzxje.aiagent.dto.chat.ChatMessageRequest;
 import prj.anhzxje.aiagent.dto.chat.ChatMessageResponse;
 import prj.anhzxje.aiagent.entity.ChatConversation;
 import prj.anhzxje.aiagent.entity.ChatMessage;
+import prj.anhzxje.aiagent.entity.Project;
 import prj.anhzxje.aiagent.entity.User;
 import prj.anhzxje.aiagent.exception.ResourceNotFoundException;
 import prj.anhzxje.aiagent.repository.ChatConversationRepository;
 import prj.anhzxje.aiagent.repository.ChatMessageRepository;
+import prj.anhzxje.aiagent.repository.ProjectRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,9 +30,9 @@ import java.util.stream.Collectors;
 /**
  * Dịch vụ Quản lý Hội thoại AI Trực tuyến (ChatService):
  * Chịu trách nhiệm:
- * 1. Khởi tạo, truy xuất, xóa các phiên hội thoại (ChatConversation) theo người dùng.
+ * 1. Khởi tạo, truy xuất, xóa các phiên hội thoại (ChatConversation) theo người dùng và dự án.
  * 2. Lưu trữ lịch sử tin nhắn của người dùng và câu trả lời của AI vào CSDL MySQL.
- * 3. Giao tiếp với Google Gemini thông qua Spring AI ChatClient để tạo câu trả lời theo thời gian thực.
+ * 3. Giao tiếp với Google Gemini thông qua Spring AI ChatClient, nạp ngữ cảnh dự án và gắn các tool duyệt file.
  * 4. Tự động ghi nhật ký kiểm toán (AuditLog) cho các tương tác hội thoại.
  */
 @Slf4j
@@ -39,20 +45,48 @@ public class ChatService {
     private final ChatClient.Builder chatClientBuilder;
     private final SystemConfigService systemConfigService;
     private final AuditLogService auditLogService;
+    private final ProjectRepository projectRepository;
+    private final ToolManagerService toolManagerService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
+    private record PreparedChatContext(
+            Long convId,
+            String chatModel,
+            boolean hasProject,
+            String projectPath,
+            String systemPrompt,
+            String promptText
+    ) {}
+
+    private <T> T runInTransaction(java.util.function.Supplier<T> action) {
+        if (transactionTemplate != null) {
+            return transactionTemplate.execute(status -> action.get());
+        }
+        return action.get();
+    }
+
+    /**
+     * Safety settings cho Gemini — cấu hình tối ưu để model không từ chối các phân tích mã nguồn/bảo mật.
+     */
+    private final List<GoogleGenAiSafetySetting> safetySettings = List.of(
+            new GoogleGenAiSafetySetting(HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, HarmBlockThreshold.BLOCK_ONLY_HIGH, HarmBlockMethod.PROBABILITY),
+            new GoogleGenAiSafetySetting(HarmCategory.HARM_CATEGORY_HARASSMENT, HarmBlockThreshold.BLOCK_ONLY_HIGH, HarmBlockMethod.PROBABILITY),
+            new GoogleGenAiSafetySetting(HarmCategory.HARM_CATEGORY_HATE_SPEECH, HarmBlockThreshold.BLOCK_ONLY_HIGH, HarmBlockMethod.PROBABILITY),
+            new GoogleGenAiSafetySetting(HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, HarmBlockThreshold.BLOCK_ONLY_HIGH, HarmBlockMethod.PROBABILITY)
+    );
 
     /** System prompt định hình phong cách phản hồi của AI trong phiên Chat */
     private static final String CHAT_SYSTEM_PROMPT = """
-            Bạn là trợ lý AI chuyên sâu về lập trình phần mềm, thiết kế hệ thống và rà soát mã nguồn (Code Review).
-            - Trả lời bằng tiếng Việt chuyên nghiệp, súc tích và thân thiện.
-            - Hướng dẫn giải pháp kỹ thuật, phân tích lỗi và đề xuất mã nguồn tối ưu có giải thích chi tiết.
-            - Khi đưa ra code, hãy định dạng Markdown chuẩn với ngôn ngữ tương ứng.
+            Bạn là Soopi - Trợ lý AI Coding Assistant chuyên sâu về lập trình phần mềm, kiến trúc hệ thống và rà soát mã nguồn (Code Review).
+            - Trả lời bằng tiếng Việt chuyên nghiệp, súc tích, chính xác và thân thiện.
+            - Hướng dẫn giải pháp kỹ thuật, phân tích nguyên nhân lỗi và đề xuất mã nguồn tối ưu có giải thích chi tiết.
+            - Khi đưa ra code, hãy định dạng Markdown chuẩn với ngôn ngữ tương ứng (ví dụ: ```java, ```javascript).
             """;
 
     /**
      * Lấy toàn bộ danh sách các cuộc hội thoại của người dùng hiện tại, sắp xếp theo thời gian mới nhất.
-     *
-     * @param user Tài khoản người dùng đang đăng nhập
-     * @return Danh sách tóm tắt cuộc hội thoại
      */
     @Transactional(readOnly = true)
     public List<ChatConversationResponse> getMyConversations(User user) {
@@ -72,23 +106,22 @@ public class ChatService {
                 .map(this::toMessageResponse)
                 .collect(Collectors.toList());
 
-        return ChatConversationDetailResponse.builder()
-                .id(conv.getId())
-                .title(conv.getTitle())
-                .model(conv.getModel())
-                .createdAt(conv.getCreatedAt())
-                .updatedAt(conv.getUpdatedAt())
-                .messages(messages)
-                .build();
+        return toConversationDetailResponse(conv, messages);
     }
 
     /**
-     * Khởi tạo một cuộc hội thoại mới với mô hình AI đã chọn hoặc mô hình mặc định.
-     * Kiểm tra tính hợp lệ của model (phải thuộc danh sách allowedModels).
+     * Khởi tạo một cuộc hội thoại mới với mô hình AI đã chọn hoặc mô hình mặc định (tương thích ngược).
      */
     @Transactional
     public ChatConversationResponse createConversation(User user, String title, String model) {
-        // Bước 1: Xác định model AI được chọn và kiểm tra danh sách whitelist
+        return createConversation(user, title, model, null);
+    }
+
+    /**
+     * Khởi tạo một cuộc hội thoại mới có liên kết với Dự án mã nguồn (Project Context).
+     */
+    @Transactional
+    public ChatConversationResponse createConversation(User user, String title, String model, Long projectId) {
         String activeModel;
         if (model != null && !model.isBlank()) {
             String trimmedModel = model.trim();
@@ -101,12 +134,18 @@ public class ChatService {
             activeModel = systemConfigService.getActiveModel();
         }
 
-        // Bước 2: Đặt tiêu đề cuộc trò chuyện
-        String convTitle = (title != null && !title.isBlank()) ? title : "Cuộc hội thoại mới";
+        Project project = null;
+        if (projectId != null) {
+            project = projectRepository.findById(projectId)
+                    .filter(p -> p.getUser().getId().equals(user.getId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dự án với id: " + projectId));
+        }
 
-        // Bước 3: Khởi tạo và lưu thực thể hội thoại
+        String convTitle = (title != null && !title.isBlank()) ? title : (project != null ? "Hội thoại: " + project.getName() : "Cuộc hội thoại mới");
+
         ChatConversation conv = ChatConversation.builder()
                 .user(user)
+                .project(project)
                 .title(convTitle)
                 .model(activeModel)
                 .createdAt(LocalDateTime.now())
@@ -114,49 +153,100 @@ public class ChatService {
                 .build();
 
         ChatConversation saved = conversationRepository.save(conv);
-
-        // Bước 4: Ghi nhật ký Audit Log
-        auditLogService.log(user.getUsername(), "CHAT_CONVERSATION_CREATE", "Tạo cuộc hội thoại mới #" + saved.getId() + ": " + saved.getTitle());
+        auditLogService.log(user.getUsername(), "CHAT_CONVERSATION_CREATE", "Tạo cuộc hội thoại mới #" + saved.getId() + ": " + saved.getTitle() + (project != null ? " (Project: " + project.getName() + ")" : ""));
         return toConversationResponse(saved);
     }
 
     /**
-     * Xóa cuộc hội thoại và toàn bộ các tin nhắn liên quan (Xóa thủ công theo nguyên lý Cascade delete).
+     * Cập nhật mô hình AI cho một cuộc hội thoại cụ thể.
+     */
+    @Transactional
+    public ChatConversationResponse updateConversationModel(Long convId, String model, User user) {
+        ChatConversation conv = findConversationAndVerifyOwner(convId, user);
+        if (model != null && !model.isBlank()) {
+            String trimmed = model.trim();
+            List<String> allowed = systemConfigService.getAllowedModels();
+            if (!allowed.contains(trimmed)) {
+                throw new IllegalArgumentException("Model '" + trimmed + "' không nằm trong danh sách model được phép: " + allowed);
+            }
+            conv.setModel(trimmed);
+            ChatConversation saved = conversationRepository.save(conv);
+            return toConversationResponse(saved);
+        }
+        return toConversationResponse(conv);
+    }
+
+    /**
+     * Xóa cuộc hội thoại và toàn bộ các tin nhắn liên quan.
      */
     @Transactional
     public void deleteConversation(Long convId, User user) {
-        // Bước 1: Xác thực quyền sở hữu
         ChatConversation conv = findConversationAndVerifyOwner(convId, user);
-        
-        // Bước 2: Xóa tất cả các tin nhắn con trong cuộc trò chuyện này
         messageRepository.deleteByConversationId(conv.getId());
-        
-        // Bước 3: Xóa cuộc trò chuyện
         conversationRepository.delete(conv);
-        
-        // Bước 4: Ghi nhật ký Audit Log
         auditLogService.log(user.getUsername(), "CHAT_CONVERSATION_DELETE", "Xóa cuộc hội thoại #" + convId);
     }
 
     /**
-     * Gửi tin nhắn từ người dùng, gọi Google Gemini sinh phản hồi và lưu cả 2 vào CSDL.
-     * Tự động nạp tối đa 10 tin nhắn gần nhất để AI duy trì ngữ cảnh đa lượt (Multi-turn Context).
+     * Gửi tin nhắn từ người dùng, nạp context dự án và gọi Google Gemini (kèm Tool Calling nếu có project).
+     * Thiết kế tách giao dịch (Decoupled Transaction):
+     * 1. Giai đoạn 1 (DB Transaction): Tạo/tìm conversation, lưu tin nhắn USER vào DB, tải ngữ cảnh, commit ngay.
+     * 2. Giai đoạn 2 (Non-Transactional I/O): Gọi API Google Gemini + Tool Calling (5-40s) NGOÀI transaction.
+     *    -> Hoàn toàn KHÔNG giữ kết nối CSDL MySQL (Connection Pool), chống cạn kiệt tài nguyên HikariCP.
+     * 3. Giai đoạn 3 (DB Transaction): Lưu tin nhắn AGENT, cập nhật updatedAt và ghi Audit Log.
      */
-    @Transactional
     public ChatMessageResponse sendMessage(ChatMessageRequest request, User user) {
+        // Giai đoạn 1: Chuẩn bị ngữ cảnh và lưu tin nhắn USER trong 1 transaction ngắn
+        PreparedChatContext payload = runInTransaction(() -> prepareUserChatContext(request, user));
+
+        // Giai đoạn 2: Gọi Google Gemini LLM + Tool Calling hoàn toàn NGOÀI transaction
+        String aiResponseText = callAiModel(payload, user.getUsername());
+
+        // Giai đoạn 3: Lưu tin nhắn AGENT và cập nhật mốc thời gian trong transaction ngắn thứ hai
+        final String finalResponse = aiResponseText;
+        return runInTransaction(() -> saveAgentResponse(payload.convId(), finalResponse, user.getUsername()));
+    }
+
+    /**
+     * Bước 1-4 trong transaction: Tìm/tạo conversation, nạp lịch sử đa lượt, lưu tin nhắn USER và chuẩn bị payload.
+     */
+    private PreparedChatContext prepareUserChatContext(ChatMessageRequest request, User user) {
         ChatConversation conv;
+        List<String> allowed = systemConfigService.getAllowedModels();
+
         // Bước 1: Tìm hội thoại hiện có hoặc tự động khởi tạo hội thoại mới
         if (request.getConversationId() != null) {
             conv = findConversationAndVerifyOwner(request.getConversationId(), user);
+            // Nếu hội thoại chưa gán project nhưng request có projectId, liên kết bổ sung
+            if (conv.getProject() == null && request.getProjectId() != null) {
+                projectRepository.findById(request.getProjectId())
+                        .filter(p -> p.getUser().getId().equals(user.getId()))
+                        .ifPresent(p -> {
+                            conv.setProject(p);
+                            conversationRepository.save(conv);
+                        });
+            }
         } else {
-            // Tự động trích xuất 35 ký tự đầu tiên để đặt tiêu đề đại diện
-            String initialTitle = request.getMessage().length() > 35
-                    ? request.getMessage().substring(0, 35) + "..."
-                    : request.getMessage();
+            Project proj = null;
+            if (request.getProjectId() != null) {
+                proj = projectRepository.findById(request.getProjectId())
+                        .filter(p -> p.getUser().getId().equals(user.getId()))
+                        .orElse(null);
+            }
+            String initialTitle = generateConversationTitle(request.getMessage(), proj);
+
+            String initModel;
+            if (request.getModel() != null && !request.getModel().isBlank() && allowed.contains(request.getModel().trim())) {
+                initModel = request.getModel().trim();
+            } else {
+                initModel = systemConfigService.getActiveModel();
+            }
+
             conv = conversationRepository.save(ChatConversation.builder()
                     .user(user)
+                    .project(proj)
                     .title(initialTitle)
-                    .model(systemConfigService.getActiveModel())
+                    .model(initModel)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build());
@@ -174,7 +264,7 @@ public class ChatService {
                 .build();
         messageRepository.save(userMsg);
 
-        // Bước 4: Xây dựng Prompt kèm ngữ cảnh đa lượt (lấy tối đa 10 tin nhắn gần nhất)
+        // Bước 4: Xây dựng Prompt kèm ngữ cảnh đa lượt
         StringBuilder promptWithContext = new StringBuilder();
         if (!previousMessages.isEmpty()) {
             promptWithContext.append("Đây là lịch sử trao đổi trước đó giữa bạn và người dùng:\n---\n");
@@ -188,35 +278,104 @@ public class ChatService {
         }
         promptWithContext.append(request.getMessage());
 
-        // Bước 5: Khởi tạo ChatClient và gọi API Google Gemini với model của cuộc hội thoại
-        String chatModel = (conv.getModel() != null && !conv.getModel().isBlank())
-                ? conv.getModel()
-                : systemConfigService.getActiveModel();
+        // Bước 5: Xác định model hiệu lực
+        String chatModel;
+        if (request.getModel() != null && !request.getModel().isBlank()) {
+            String requestedModel = request.getModel().trim();
+            if (allowed.contains(requestedModel)) {
+                chatModel = requestedModel;
+                if (!requestedModel.equals(conv.getModel())) {
+                    conv.setModel(requestedModel);
+                    conversationRepository.save(conv);
+                }
+            } else {
+                chatModel = (conv.getModel() != null && !conv.getModel().isBlank() && allowed.contains(conv.getModel()))
+                        ? conv.getModel()
+                        : systemConfigService.getActiveModel();
+            }
+        } else {
+            chatModel = (conv.getModel() != null && !conv.getModel().isBlank())
+                    ? conv.getModel()
+                    : systemConfigService.getActiveModel();
+            // Auto-fallback: nếu model đã bị Google ngừng hỗ trợ (không còn trong danh sách allowed), chuyển sang active model
+            if (!allowed.contains(chatModel)) {
+                String fallbackModel = systemConfigService.getActiveModel();
+                log.warn("Model '{}' không còn được hỗ trợ, tự động chuyển sang '{}'", chatModel, fallbackModel);
+                chatModel = fallbackModel;
+                conv.setModel(fallbackModel);
+                conversationRepository.save(conv);
+            }
+        }
 
+        String systemPrompt = buildSystemPrompt(conv.getProject());
+        boolean hasProject = conv.getProject() != null;
+        String projectPath = (hasProject && conv.getProject() != null) ? conv.getProject().getPath() : null;
+
+        return new PreparedChatContext(conv.getId(), chatModel, hasProject, projectPath, systemPrompt, promptWithContext.toString());
+    }
+
+    /**
+     * Gọi Google Gemini AI hoàn toàn ngoài transaction để không giữ kết nối Database.
+     */
+    private String callAiModel(PreparedChatContext payload, String username) {
         String aiResponseText;
         try {
-            var promptSpec = chatClientBuilder.build()
-                    .prompt()
-                    .system(CHAT_SYSTEM_PROMPT)
-                    .user(promptWithContext.toString());
-
-            if (chatModel != null && !chatModel.isBlank()) {
-                promptSpec.options(GoogleGenAiChatOptions.builder().model(chatModel));
+            ChatClient.Builder effectiveBuilder = null;
+            if (systemConfigService != null) {
+                try {
+                    effectiveBuilder = systemConfigService.getChatClientBuilder(chatClientBuilder);
+                } catch (Exception e) {
+                    log.warn("Lỗi khi lấy ChatClient.Builder từ SystemConfigService: {}", e.getMessage());
+                }
             }
+            if (effectiveBuilder == null) {
+                effectiveBuilder = chatClientBuilder;
+            }
+
+            var promptSpec = effectiveBuilder.build()
+                    .prompt()
+                    .system(payload.systemPrompt())
+                    .user(payload.promptText());
+
+            // Gắn Tool Calling nếu hội thoại có project context
+            if (payload.hasProject() && toolManagerService != null) {
+                List<Object> dynamicTools = toolManagerService.resolveActiveTools(null, payload.projectPath());
+                if (!dynamicTools.isEmpty()) {
+                    promptSpec.tools(dynamicTools.toArray());
+                }
+            }
+
+            var optionsBuilder = GoogleGenAiChatOptions.builder()
+                    .safetySettings(safetySettings);
+            if (payload.chatModel() != null && !payload.chatModel().isBlank()) {
+                optionsBuilder.model(payload.chatModel());
+            }
+            promptSpec.options(optionsBuilder);
 
             aiResponseText = promptSpec.call().content();
 
-            // Đảm bảo không trả về chuỗi rỗng nếu AI phản hồi trống
             if (aiResponseText == null || aiResponseText.isBlank()) {
                 aiResponseText = "Xin lỗi, tôi không thể tạo câu trả lời vào lúc này. Vui lòng thử lại.";
             }
         } catch (Exception e) {
-            // Xử lý ngoại lệ an toàn: ghi log lỗi và cung cấp thông báo rõ ràng cho người dùng
-            log.error("Lỗi khi gọi AI Chat cho user {}: {}", user.getUsername(), e.getMessage());
-            aiResponseText = "Đã xảy ra lỗi khi trao đổi với AI: " + e.getMessage();
+            log.error("Lỗi khi gọi AI Chat cho user {}: {}", username, e.getMessage(), e);
+            Throwable root = e;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            String detailMsg = root.getMessage() != null ? root.getMessage() : e.getMessage();
+            aiResponseText = "⚠️ **Đã xảy ra lỗi khi trao đổi với AI Agent:**\n\n" + detailMsg + "\n\n*Gợi ý: Nếu gặp lỗi Quota/Rate limit (429) hoặc tạm thời quá tải, vui lòng chuyển đổi model khác hoặc thử lại sau giây lát.*";
         }
+        return aiResponseText;
+    }
 
-        // Bước 6: Lưu tin nhắn phản hồi của AI Agent (AGENT) vào CSDL
+    /**
+     * Bước 6-8 trong transaction thứ hai: Lưu tin nhắn AGENT, cập nhật mốc thời gian và ghi nhật ký Audit Log.
+     */
+    private ChatMessageResponse saveAgentResponse(Long convId, String aiResponseText, String username) {
+        ChatConversation conv = conversationRepository.findById(convId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hội thoại với id: " + convId));
+
         ChatMessage agentMsg = ChatMessage.builder()
                 .conversation(conv)
                 .sender("AGENT")
@@ -225,18 +384,134 @@ public class ChatService {
                 .build();
         ChatMessage savedAgentMsg = messageRepository.save(agentMsg);
 
-        // Bước 7: Cập nhật mốc thời gian hoạt động mới nhất cho cuộc hội thoại
         conv.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conv);
 
-        // Bước 8: Ghi nhật ký Audit Log và trả về phản hồi
-        auditLogService.log(user.getUsername(), "CHAT_MESSAGE", "Trao đổi với AI trong hội thoại #" + conv.getId());
+        auditLogService.log(username, "CHAT_MESSAGE", "Trao đổi với AI trong hội thoại #" + conv.getId());
         return toMessageResponse(savedAgentMsg);
     }
 
     /**
+     * Xây dựng System Prompt định hướng cho AI, kèm thông tin chi tiết về dự án nếu có.
+     * Cung cấp các tính năng chuyên sâu chuẩn Antigravity:
+     * - /review: Rà soát toàn diện mã nguồn, tìm lỗi logic, bảo mật, hiệu năng
+     * - /fix: Chẩn đoán lỗi, đề xuất bản vá và tạo mã sửa hoàn chỉnh
+     * - /explain: Giải thích cấu trúc kiến trúc và luồng dữ liệu của codebase
+     * - /test: Tự động sinh mã kiểm thử đơn vị (Unit Tests)
+     */
+    private String buildSystemPrompt(Project project) {
+        if (project == null) {
+            return CHAT_SYSTEM_PROMPT;
+        }
+        return CHAT_SYSTEM_PROMPT + """
+
+                --- DỰ ÁN MÃ NGUỒN HIỆN TẠI (PROJECT WORKSPACE) ---
+                - Tên dự án: %s
+                - Thư mục gốc: %s
+                - Ngôn ngữ chính: %s
+                - Mô tả: %s
+
+                --- NGUYÊN TẮC HOẠT ĐỘNG & CÔNG CỤ (TOOLS) ---
+                1. Bạn có các công cụ duyệt tệp (list_directory, glob, file_system, grep) để thao tác trực tiếp trên thư mục dự án `%s`.
+                2. Bạn PHẢI LUÔN chủ động dùng các công cụ này để đọc nội dung file mã nguồn thực tế trước khi đưa ra nhận định, giải thích hay sửa code.
+                3. Tuyệt đối KHÔNG đoán mò hoặc bịa đặt mã nguồn không tồn tại. Mọi câu trả lời kỹ thuật phải bám sát code thật.
+                4. Chỉ đọc và thao tác trong phạm vi thư mục gốc của dự án. Không truy cập các thư mục ngoài dự án.
+
+                --- CÁC TÍNH NĂNG CHUYÊN SÂU CHUẨN ANTIGRAVITY ---
+                Khi người dùng sử dụng các lệnh Slash Command hoặc đưa ra yêu cầu tương ứng, hãy thực thi như sau:
+
+                1. **`/review` [trọng tâm tùy chọn: security, performance, bugs, code_quality, all]**
+                   - Khám phá cấu trúc dự án, đọc các file cấu hình và lớp xử lý cốt lõi.
+                   - Trả về báo cáo Code Review chuyên nghiệp bằng tiếng Việt dạng Markdown gồm:
+                     * **Tổng quan (Summary):** Đánh giá chung về chất lượng mã nguồn.
+                     * **Vấn đề phát hiện (Issues):** Liệt kê theo mức độ (CRITICAL / HIGH / MEDIUM / LOW), chỉ rõ tệp tin, phân tích lỗi cụ thể và khuyến nghị sửa.
+                     * **Đề xuất cải tiến (Suggestions):** Các tối ưu kiến trúc và hiệu năng tiếp theo.
+
+                2. **`/fix` [mô tả lỗi hoặc tệp cần sửa]**
+                   - Đọc file mã nguồn bị lỗi, phân tích nguyên nhân gốc rễ (Root Cause).
+                   - Đưa ra giải pháp sửa lỗi rõ ràng và cung cấp đoạn code hoàn chỉnh (hoặc code diff) đã được khắc phục, có thể copy & áp dụng ngay.
+
+                3. **`/explain` [tên file, method hoặc tính năng]**
+                   - Đọc các tệp mã nguồn liên quan.
+                   - Giải thích rõ ràng kiến trúc, luồng thực thi (execution flow), vai trò của các lớp/hàm và mẫu thiết kế (design patterns) được sử dụng.
+
+                4. **`/test` [tên class hoặc chức năng cần viết test]**
+                   - Đọc mã nguồn của class/phương thức cần viết kiểm thử.
+                   - Tự động sinh file kiểm thử đơn vị hoàn chỉnh (ví dụ: JUnit 5 + Mockito cho Java, Jest/Mocha cho JS/TS, pytest cho Python) với đầy đủ ca thành công, ca biên và ngoại lệ.
+
+                --- ĐỊNH DẠNG ĐẦU RA ---
+                - Trả về văn bản định dạng Rich Markdown thuần, thân thiện, rõ ràng và có cấu trúc mạch lạc.
+                - Sử dụng khối mã nguồn chuẩn với ngôn ngữ tương ứng (ví dụ: ```java, ```sql, ```bash).
+                - Không trả về JSON thô trừ khi người dùng yêu cầu rõ ràng.
+                """.formatted(
+                project.getName(),
+                project.getPath() != null ? project.getPath() : "Không xác định",
+                project.getLanguage() != null ? project.getLanguage() : "Đa ngôn ngữ",
+                project.getDescription() != null ? project.getDescription() : "Không có mô tả",
+                project.getPath() != null ? project.getPath() : "."
+        );
+    }
+
+    /**
+     * Tạo tiêu đề ngắn gọn, chuẩn mực cho cuộc hội thoại, loại bỏ các lệnh slash thô và định dạng markdown.
+     */
+    private String generateConversationTitle(String rawMessage, Project project) {
+        if (rawMessage == null || rawMessage.isBlank()) {
+            return project != null ? "Hội thoại: " + project.getName() : "Hỏi đáp chung";
+        }
+        String text = rawMessage.trim();
+
+        // 1. Nhận diện các lệnh Slash commands Antigravity
+        if (text.startsWith("/review")) {
+            String rest = text.substring(7).trim();
+            if (rest.isBlank() || rest.toLowerCase().contains("toàn diện mã nguồn")) {
+                return project != null ? "Code Review: " + project.getName() : "Code Review";
+            }
+            return "Review: " + cleanTextForTitle(rest, 22);
+        } else if (text.startsWith("/fix")) {
+            String rest = text.substring(4).trim();
+            if (rest.isBlank() || rest.toLowerCase().contains("chẩn đoán") || rest.toLowerCase().contains("file:")) {
+                return project != null ? "Sửa lỗi: " + project.getName() : "Sửa lỗi code";
+            }
+            return "Fix: " + cleanTextForTitle(rest, 24);
+        } else if (text.startsWith("/explain")) {
+            String rest = text.substring(8).trim();
+            if (rest.isBlank() || rest.toLowerCase().contains("giải thích") || rest.toLowerCase().contains("file:")) {
+                return project != null ? "Giải thích: " + project.getName() : "Giải thích code";
+            }
+            return "Explain: " + cleanTextForTitle(rest, 20);
+        } else if (text.startsWith("/test")) {
+            String rest = text.substring(5).trim();
+            if (rest.isBlank() || rest.toLowerCase().contains("bộ unit tests") || rest.toLowerCase().contains("cho:")) {
+                return project != null ? "Unit Test: " + project.getName() : "Sinh Unit Test";
+            }
+            return "Test: " + cleanTextForTitle(rest, 24);
+        }
+
+        return cleanTextForTitle(text, 28);
+    }
+
+    private String cleanTextForTitle(String text, int maxLength) {
+        if (text == null) return "Hội thoại";
+        // Bỏ ký tự markdown và khoảng trắng thừa, ngắt dòng
+        String clean = text.replaceAll("[#*`_~>\\[\\]()\\n\\r]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (clean.isBlank()) return "Hội thoại";
+        // Viết hoa chữ cái đầu
+        clean = Character.toUpperCase(clean.charAt(0)) + (clean.length() > 1 ? clean.substring(1) : "");
+        if (clean.length() <= maxLength) {
+            return clean;
+        }
+        int cutIndex = clean.lastIndexOf(' ', maxLength);
+        if (cutIndex > 10) {
+            return clean.substring(0, cutIndex) + "...";
+        }
+        return clean.substring(0, maxLength) + "...";
+    }
+
+    /**
      * Xác minh quyền sở hữu cuộc hội thoại của người dùng.
-     * Bảo mật chống IDOR: Trả về ResourceNotFoundException dù cuộc hội thoại có tồn tại ở user khác hay không.
      */
     private ChatConversation findConversationAndVerifyOwner(Long convId, User user) {
         ChatConversation conv = conversationRepository.findById(convId)
@@ -248,28 +523,32 @@ public class ChatService {
         return conv;
     }
 
-    /**
-     * Chuyển đổi thực thể ChatConversation sang DTO ChatConversationResponse tóm tắt.
-     *
-     * @param conv thực thể ChatConversation nguồn
-     * @return ChatConversationResponse DTO
-     */
     private ChatConversationResponse toConversationResponse(ChatConversation conv) {
         return ChatConversationResponse.builder()
                 .id(conv.getId())
                 .title(conv.getTitle())
                 .model(conv.getModel())
+                .projectId(conv.getProject() != null ? conv.getProject().getId() : null)
+                .projectName(conv.getProject() != null ? conv.getProject().getName() : null)
                 .createdAt(conv.getCreatedAt())
                 .updatedAt(conv.getUpdatedAt())
                 .build();
     }
 
-    /**
-     * Chuyển đổi thực thể ChatMessage sang DTO ChatMessageResponse.
-     *
-     * @param msg thực thể ChatMessage nguồn
-     * @return ChatMessageResponse DTO
-     */
+    private ChatConversationDetailResponse toConversationDetailResponse(ChatConversation conv, List<ChatMessageResponse> messages) {
+        return ChatConversationDetailResponse.builder()
+                .id(conv.getId())
+                .title(conv.getTitle())
+                .model(conv.getModel())
+                .projectId(conv.getProject() != null ? conv.getProject().getId() : null)
+                .projectName(conv.getProject() != null ? conv.getProject().getName() : null)
+                .projectPath(conv.getProject() != null ? conv.getProject().getPath() : null)
+                .createdAt(conv.getCreatedAt())
+                .updatedAt(conv.getUpdatedAt())
+                .messages(messages)
+                .build();
+    }
+
     private ChatMessageResponse toMessageResponse(ChatMessage msg) {
         return ChatMessageResponse.builder()
                 .id(msg.getId())

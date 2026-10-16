@@ -210,6 +210,58 @@ class AdminControllerSecurityAndManagementTest {
     }
 
     @Test
+    void testGetAllUsers_UsesGroupedQueriesWithoutNPlusOne() {
+        when(userRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(adminUser, regularUser));
+        when(projectRepository.countProjectsGroupedByUser()).thenReturn(List.of(
+                new Object[]{1L, 3L},
+                new Object[]{2L, 5L}
+        ));
+        when(agentTaskRepository.countTasksGroupedByUser()).thenReturn(List.of(
+                new Object[]{1L, 10L},
+                new Object[]{2L, 20L}
+        ));
+
+        ResponseEntity<List<UserSummaryResponse>> res = adminController.getAllUsers();
+        assertNotNull(res.getBody());
+        assertEquals(2, res.getBody().size());
+
+        UserSummaryResponse u1 = res.getBody().get(0);
+        assertEquals("admin", u1.getUsername());
+        assertEquals(3L, u1.getProjectCount());
+        assertEquals(10L, u1.getTaskCount());
+
+        UserSummaryResponse u2 = res.getBody().get(1);
+        assertEquals("alice", u2.getUsername());
+        assertEquals(5L, u2.getProjectCount());
+        assertEquals(20L, u2.getTaskCount());
+
+        // Đảm bảo không gọi countByUserId lẻ tẻ theo từng user
+        verify(projectRepository, never()).countByUserId(any());
+        verify(agentTaskRepository, never()).countByUserId(any());
+        verify(projectRepository, times(1)).countProjectsGroupedByUser();
+        verify(agentTaskRepository, times(1)).countTasksGroupedByUser();
+    }
+
+    @Test
+    void testGetAllTasks_WithPagination() {
+        AgentTask task = AgentTask.builder()
+                .id(1L)
+                .user(regularUser)
+                .status(JobStatus.COMPLETED)
+                .type(TaskType.CODE_REVIEW)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        org.springframework.data.domain.Page<AgentTask> page = new org.springframework.data.domain.PageImpl<>(List.of(task));
+        when(agentTaskRepository.findAll(any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
+
+        ResponseEntity<List<AdminTaskResponse>> res = adminController.getAllTasks(null, null, 0, 10);
+        assertNotNull(res.getBody());
+        assertEquals(1, res.getBody().size());
+        assertEquals(1L, res.getBody().get(0).getId());
+    }
+
+    @Test
     void testGetStats_Success() {
         when(userRepository.count()).thenReturn(10L);
         when(userRepository.countByRole(Role.ADMIN)).thenReturn(2L);

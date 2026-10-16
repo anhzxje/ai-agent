@@ -37,7 +37,7 @@ spring:
 
 # 4. Cấu hình Cổng Web Server
 server:
-  port: 8081
+  port: 8080
 
 # 5. Cấu hình Chuẩn bảo mật JSON Web Token (JWT)
 jwt:

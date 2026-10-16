@@ -6,10 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import prj.anhzxje.aiagent.dto.chat.ChatConversationDetailResponse;
-import prj.anhzxje.aiagent.dto.chat.ChatConversationResponse;
-import prj.anhzxje.aiagent.dto.chat.ChatMessageRequest;
-import prj.anhzxje.aiagent.dto.chat.ChatMessageResponse;
+import prj.anhzxje.aiagent.dto.chat.*;
 import prj.anhzxje.aiagent.security.CustomUserDetails;
 import prj.anhzxje.aiagent.service.ChatService;
 
@@ -55,12 +52,13 @@ public class ChatController {
      */
     @PostMapping("/conversations")
     public ResponseEntity<ChatConversationResponse> createConversation(
-            @RequestBody(required = false) Map<String, String> body,
+            @Valid @RequestBody(required = false) CreateConversationRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        String title = body != null ? body.get("title") : null;
-        String model = body != null ? body.get("model") : null;
+        String title = request != null ? request.getTitle() : null;
+        String model = request != null ? request.getModel() : null;
+        Long projectId = request != null ? request.getProjectId() : null;
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(chatService.createConversation(userDetails.getUser(), title, model));
+                .body(chatService.createConversation(userDetails.getUser(), title, model, projectId));
     }
 
     /**
@@ -90,6 +88,23 @@ public class ChatController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         chatService.deleteConversation(id, userDetails.getUser());
         return ResponseEntity.ok(Map.of("message", "Đã xóa cuộc hội thoại #" + id + " thành công"));
+    }
+
+    /**
+     * Cập nhật mô hình AI cho cuộc hội thoại.
+     *
+     * @param id          mã định danh cuộc hội thoại
+     * @param body        chứa thuộc tính model
+     * @param userDetails thông tin xác thực của người dùng hiện tại
+     * @return ResponseEntity chứa ChatConversationResponse sau khi cập nhật
+     */
+    @PatchMapping("/conversations/{id}/model")
+    public ResponseEntity<ChatConversationResponse> updateConversationModel(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateChatModelRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String model = request != null ? request.getModel() : null;
+        return ResponseEntity.ok(chatService.updateConversationModel(id, model, userDetails.getUser()));
     }
 
     /**

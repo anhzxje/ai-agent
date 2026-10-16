@@ -40,8 +40,20 @@
           </svg>
         </button>
 
+        <!-- Mode Switcher: AI Chatbot vs Projects -->
+        <div class="nav-mode-pills" id="navModePills" style="display: none;">
+          <button class="nav-mode-btn active" id="btnModeChat" title="Không gian Trò chuyện & Tác tử AI Antigravity">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            AI Chatbot
+          </button>
+          <button class="nav-mode-btn" id="btnModeReview" title="Danh sách Thư mục Dự án">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            Thư mục Dự án
+          </button>
+        </div>
+
         <!-- Current Workspace Breadcrumb -->
-        <div class="workspace-select-badge" id="btnSelectWorkspace" title="Dự án đang làm việc" style="display: none;">
+        <div class="workspace-select-badge" id="btnSelectWorkspace" title="Bấm để xem danh sách dự án" style="display: none; cursor: pointer;">
           <span style="opacity: 0.6;">workspace</span>
           <span>/</span>
           <span id="navActiveProjectText" style="font-weight: 600;">soopi</span>
@@ -57,12 +69,7 @@
 
         <!-- New Project Action (shown only when authenticated) -->
         <button class="btn-nav-secondary" id="btnTopOpenProject" style="display: none;">
-          Mở dự án
-        </button>
-
-        <!-- New AI Task Action (shown only when authenticated) -->
-        <button class="btn-nav-action" id="btnTopNewTask" style="display: none;">
-          Chạy AI Review
+          Mở thư mục dự án
         </button>
 
         <!-- Database & Backend Status Pill (shown only when authenticated) -->
@@ -98,6 +105,23 @@
       <!-- Left Sidebar (Edge-to-Edge) -->
       <aside class="app-sidebar" id="appSidebar">
         <div class="sidebar-scroll">
+
+          <!-- Section 0: CONVERSATIONS (Đoạn chat AI) -->
+          <div class="sidebar-section" id="sectionSidebarConversations" style="display: none;">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="section-label">Đoạn chat gần đây</span>
+              <button class="btn-sidebar-add" id="btnSidebarNewChat" title="Tạo cuộc hội thoại mới">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Mới</span>
+              </button>
+            </div>
+            <div id="sidebarConversationsContainer" class="sidebar-conversations-list">
+              <!-- Rendered via JS from real DB conversations -->
+            </div>
+          </div>
 
           <!-- Section 1: PINNED (Chỉ hiển thị khi có task được ghim) -->
           <div class="sidebar-section" id="sectionPinnedTasks" style="display: none;">
@@ -161,6 +185,9 @@
               <button class="btn-landing-primary" id="btnLandingLogin">
                 Đăng nhập tài khoản
               </button>
+              <button class="btn-landing-secondary" id="btnLandingQuickLogin" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35);">
+                ⚡ Vào nhanh (Admin)
+              </button>
               <button class="btn-landing-secondary" id="btnLandingRegister">
                 Tạo tài khoản mới
               </button>
@@ -183,22 +210,165 @@
           </div>
         </section>
 
-        <!-- VIEW 1: WELCOME SCREEN (Chỉ hiển thị khi ĐÃ đăng nhập) -->
+        <!-- VIEW 0.5: CENTRAL AI CODING ASSISTANT CHATBOT (Không gian làm việc chính chuẩn Antigravity) -->
+        <section class="chat-assistant-container" id="chatAssistantView" style="display: none;">
+          <!-- Workspace Header Bar -->
+          <div class="chat-header-bar">
+            <div class="chat-header-left">
+              <div class="chat-workspace-badge" id="chatWorkspaceBadge" title="Chưa chọn dự án">
+                <span class="chat-status-dot" title="Gemini AI & Công cụ hệ thống sẵn sàng"></span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span id="chatWorkspaceName" class="workspace-name-bold">Hỏi đáp chung</span>
+                <span class="workspace-path-tag" id="chatWorkspacePath" style="display: none;"></span>
+                <button type="button" class="btn-switch-workspace" id="btnSwitchWorkspace" title="Đổi sang dự án khác">Đổi dự án</button>
+                <button type="button" class="btn-delete-workspace" id="btnDeleteActiveProject" title="Xóa dự án này khỏi hệ thống" style="display: none;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  Xóa
+                </button>
+              </div>
+              <h2 id="activeChatTitle" class="chat-active-title" style="display: none;">Hỏi đáp chung</h2>
+            </div>
+            <div class="chat-header-right">
+              <div class="chat-model-selector-wrap" title="Chọn mô hình AI">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                <select id="selectChatModel" class="chat-model-select">
+                  <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                  <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                </select>
+              </div>
+              <button class="btn-nav-secondary" id="btnHeaderNewChat" title="Tạo phiên làm việc mới">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Phiên mới
+              </button>
+              <button class="btn-nav-secondary btn-danger-soft" id="btnDeleteActiveChat" title="Xóa phiên làm việc này">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+              <button class="btn-nav-secondary" id="btnChatBackHome" title="Về danh sách dự án">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Dự án
+              </button>
+            </div>
+          </div>
+
+          <!-- Messages Stream Scroll Area -->
+          <div class="chat-stream-area" id="chatStreamArea">
+            <div class="chat-empty-state" id="chatEmptyState">
+              <div class="empty-ai-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                  <polyline points="2 17 12 22 22 17"></polyline>
+                  <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+              </div>
+              <h3 id="emptyStateTitle">Antigravity AI Coding Assistant</h3>
+              <p id="emptyStateDesc">Không gian làm việc trực tiếp trên dự án. AI tự động duyệt cây thư mục, đọc mã nguồn, tìm kiếm regex và thực thi các tính năng chuyên sâu.</p>
+              
+              <div class="antigravity-features-grid">
+                <div class="antigravity-feat-card" data-cmd="/review">
+                  <div class="feat-card-header">
+                    <span class="feat-badge review">/review</span>
+                    <span class="feat-name">Code Review</span>
+                  </div>
+                  <p class="feat-desc">Khám phá codebase, rà soát lỗi logic, bảo mật, hiệu năng và kiến trúc tổng thể.</p>
+                </div>
+
+                <div class="antigravity-feat-card" data-cmd="/fix">
+                  <div class="feat-card-header">
+                    <span class="feat-badge fix">/fix</span>
+                    <span class="feat-name">Code Fix</span>
+                  </div>
+                  <p class="feat-desc">Chẩn đoán nguyên nhân lỗi, đề xuất giải pháp và xuất đoạn code sửa chữa hoàn chỉnh.</p>
+                </div>
+
+                <div class="antigravity-feat-card" data-cmd="/explain">
+                  <div class="feat-card-header">
+                    <span class="feat-badge explain">/explain</span>
+                    <span class="feat-name">Code Explain</span>
+                  </div>
+                  <p class="feat-desc">Giải thích cấu trúc, luồng thực thi và các thuật toán trong tệp hoặc phương thức.</p>
+                </div>
+
+                <div class="antigravity-feat-card" data-cmd="/test">
+                  <div class="feat-card-header">
+                    <span class="feat-badge test">/test</span>
+                    <span class="feat-name">Test Gen</span>
+                  </div>
+                  <p class="feat-desc">Tự động sinh bộ unit tests (JUnit 5, Mockito...) với đầy đủ ca kiểm thử biên.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-messages-list" id="chatMessagesList">
+              <!-- Dynamic message cards populated here -->
+            </div>
+
+            <!-- Typing & Reasoning indicator -->
+            <div class="chat-typing-indicator" id="chatTypingIndicator" style="display: none;">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-text" id="chatTypingText">AI Agent đang đọc mã nguồn dự án và suy luận...</span>
+            </div>
+          </div>
+
+          <!-- Antigravity Quick Commands & Chat Input Dock -->
+          <div class="chat-input-dock">
+            <div class="antigravity-slash-chips">
+              <span class="slash-chips-label">Tính năng:</span>
+              <button type="button" class="slash-chip" data-cmd="/review">🔍 /review (Code Review)</button>
+              <button type="button" class="slash-chip" data-cmd="/fix">🛠️ /fix (Sửa lỗi code)</button>
+              <button type="button" class="slash-chip" data-cmd="/explain">💡 /explain (Giải thích code)</button>
+              <button type="button" class="slash-chip" data-cmd="/test">🧪 /test (Sinh Unit Test)</button>
+            </div>
+            <div class="chat-input-wrapper">
+              <textarea id="centralChatTextarea" rows="1" placeholder="Hỏi AI về mã nguồn hoặc gõ /review, /fix, /explain, /test..."></textarea>
+              <div class="chat-input-actions">
+                <span class="chat-input-hint" id="chatProjectHintText">Enter để gửi • Shift+Enter xuống dòng</span>
+                <button class="btn-send-chat" id="btnSendCentralChat" title="Gửi tin nhắn">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 1: WELCOME SCREEN (Quản lý và chọn Thư mục Dự án) -->
         <section class="welcome-container" id="welcomeView" style="display: none;">
           <div class="welcome-hero">
             <div class="welcome-logo-row">
               <svg width="42" height="26" viewBox="0 0 100 36" fill="currentColor">
                 <path d="M4 26L28 8H96L88 26H4Z"/>
               </svg>
-              <h1 class="welcome-title">Soopi</h1>
+              <h1 class="welcome-title">Soopi AI Agent</h1>
             </div>
             <p class="welcome-subtitle">
-              Nền tảng Tác tử AI Đánh giá Mã nguồn dựa trên Spring AI và MySQL<br>
-              Tự động gọi công cụ hệ thống để rà soát bảo mật, chất lượng và hiệu năng.
+              Nền tảng Tác tử AI Hỗ trợ Lập trình theo chuẩn Antigravity<br>
+              Chọn thư mục dự án trên máy tính để bắt đầu làm việc trực tiếp qua phiên Chatbot AI.
             </p>
           </div>
 
-          <!-- Admin Command & Governance Center (Hiển thị nổi bật dành riêng cho tài khoản role ADMIN) -->
+          <!-- Admin Command & Governance Center (Hiển thị cho ADMIN) -->
           <div class="admin-command-center" id="adminCommandCenter" style="display: none;">
             <div class="admin-center-header">
               <div class="admin-center-title-wrap">
@@ -208,19 +378,17 @@
               <button class="btn-nav-admin" id="btnAdminQuickOpenPanel">Mở Bảng Quản trị & Phân quyền</button>
             </div>
             <p class="admin-center-desc">
-              Tài khoản của bạn được cấp đặc quyền Quản trị viên (ADMIN). Bạn có toàn quyền quản lý tài khoản thành viên, thanh tra nhật ký tác vụ AI / chat được bảo mật, điều chỉnh vai trò và kiểm tra trạng thái CSDL MySQL.
+              Tài khoản Quản trị viên (ADMIN): Quản lý người dùng, cấu hình model AI và giám sát CSDL MySQL.
             </p>
             <div class="admin-quick-stats-row">
               <div class="admin-quick-stat-pill" id="quickStatUsersBadge">0 Người dùng</div>
               <div class="admin-quick-stat-pill" id="quickStatProjectsBadge">0 Dự án</div>
-              <div class="admin-quick-stat-pill" id="quickStatTasksBadge">0 Tác vụ AI</div>
               <div class="admin-quick-stat-pill online" id="quickStatDbBadge">CSDL MySQL: Sẵn sàng</div>
             </div>
           </div>
 
-          <!-- Quick Action Cards List (2 cards) -->
+          <!-- Quick Action Cards List -->
           <div class="action-cards-grid">
-            <!-- Action 1: Open project -->
             <div class="action-card" id="cardActionOpenProject">
               <div class="card-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -228,178 +396,26 @@
                 </svg>
               </div>
               <div class="card-content">
-                <div class="card-title">Mở dự án cục bộ</div>
-                <div class="card-description">Đăng ký thư mục mã nguồn từ ổ đĩa máy tính vào CSDL</div>
+                <div class="card-title">Mở thư mục dự án mới</div>
+                <div class="card-description">Chọn thư mục mã nguồn từ ổ đĩa máy tính để làm việc trực tiếp với AI</div>
               </div>
-              <div class="card-shortcut">↵ Enter</div>
-            </div>
-
-            <!-- Action 2: Run AI Review -->
-            <div class="action-card" id="cardActionNewReview">
-              <div class="card-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-              </div>
-              <div class="card-content">
-                <div class="card-title">Khởi tạo tác vụ AI Review</div>
-                <div class="card-description">AI Agent tự động rà soát lỗ hổng bảo mật, lỗi tiềm ẩn và đề xuất bản vá</div>
-              </div>
+              <div class="card-shortcut">Mở</div>
             </div>
           </div>
 
-          <!-- Section: Tác vụ Đánh giá từ CSDL -->
-          <div class="welcome-recent-tasks" id="welcomeRecentTasksSection">
+          <!-- Section: Danh sách Dự án -->
+          <div class="welcome-recent-tasks" id="welcomeProjectsSection">
             <div class="section-title-row">
               <div class="section-title-left">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M9 11l3 3L22 4"></path>
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
-                <h3 class="section-title-text">Tác vụ AI đánh giá</h3>
-                <span class="count-badge" id="welcomeTasksCount">0</span>
+                <h3 class="section-title-text">Thư mục dự án của bạn</h3>
+                <span class="count-badge" id="welcomeProjectsCount">0</span>
               </div>
-              <button class="btn-refresh-tasks" id="btnRefreshTasks" title="Làm mới danh sách từ CSDL MySQL">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="23 4 23 10 17 10"></polyline>
-                  <polyline points="1 20 1 14 7 14"></polyline>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-                Đồng bộ CSDL
-              </button>
             </div>
-            <div class="recent-tasks-grid" id="recentTasksGrid">
+            <div class="recent-projects-grid" id="welcomeProjectsGrid">
               <!-- Dynamically populated from CSDL -->
-            </div>
-          </div>
-        </section>
-
-        <!-- VIEW 2: PROJECT & AI REVIEW WORKSPACE -->
-        <section class="workspace-container" id="workspaceView" style="display: none;">
-          <!-- Workspace Top Bar -->
-          <div class="workspace-top-bar">
-            <div class="workspace-top-left">
-              <h2 id="viewProjectTitle">Dự án</h2>
-              <div class="workspace-meta-line">
-                <span id="viewProjectPath">Đường dẫn</span>
-                <span>•</span>
-                <span id="viewProjectLang">Java</span>
-                <span>•</span>
-                <span id="viewTaskStatusPill" class="severity-tag LOW">COMPLETED</span>
-                <span>•</span>
-                <span id="viewTaskTimestamp" style="color: var(--text-muted);">vừa xong</span>
-              </div>
-            </div>
-            <div class="workspace-top-actions">
-              <!-- Task Action Controls -->
-              <button class="btn-nav-secondary" id="btnCancelTask" style="display:none; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" title="Hủy tác vụ AI đang thực thi">Hủy</button>
-              <button class="btn-nav-secondary" id="btnRetryTask" title="Chạy lại tác vụ này với cấu hình cũ">Chạy lại</button>
-              <button class="btn-nav-secondary" id="btnDeleteTask" style="color: #ef4444;" title="Xóa vĩnh viễn tác vụ này khỏi CSDL">Xóa</button>
-
-              <button class="btn-nav-secondary" id="btnPinActiveTask" title="Ghim hoặc bỏ ghim tác vụ này lên thanh bên">
-                <span id="pinActiveTaskIcon" style="display: none;"></span>
-                <span id="pinActiveTaskLabel">Ghim</span>
-              </button>
-              <button class="btn-nav-secondary" id="btnBackToHome">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="15 18 9 12 15 6"></polyline>
-                </svg>
-                Trang chính
-              </button>
-              <button class="btn-nav-action" id="btnWorkspaceRunReview">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-                Chạy AI Review Mới
-              </button>
-            </div>
-          </div>
-
-          <!-- Tabs Bar -->
-          <div class="view-tabs-bar">
-            <div class="view-tab-btn active" data-tab="findings">Kết quả đánh giá (<span id="totalFindingsNum">0</span>)</div>
-            <div class="view-tab-btn" data-tab="tooltrace">Vết gọi công cụ</div>
-            <div class="view-tab-btn" data-tab="tasks">Lịch sử tác vụ (<span id="totalTasksNum">0</span>)</div>
-            <div class="view-tab-btn" data-tab="chat">Trò chuyện AI (Chat)</div>
-          </div>
-
-          <!-- Tab 1: Findings -->
-          <div class="tab-scroll-body" id="tabFindingsBody">
-            <!-- Metrics Row -->
-            <div class="metrics-row">
-              <div class="metric-box">
-                <div class="metric-title">Critical Risks</div>
-                <div class="metric-count critical" id="metricCritical">0</div>
-              </div>
-              <div class="metric-box">
-                <div class="metric-title">High Severity</div>
-                <div class="metric-count high" id="metricHigh">0</div>
-              </div>
-              <div class="metric-box">
-                <div class="metric-title">Medium Warnings</div>
-                <div class="metric-count medium" id="metricMedium">0</div>
-              </div>
-              <div class="metric-box">
-                <div class="metric-title">Code Quality</div>
-                <div class="metric-count low" id="metricLow">0</div>
-              </div>
-            </div>
-
-            <!-- AI Summary Box from CSDL -->
-            <div class="ai-summary-card" id="aiSummaryCard" style="display: none;">
-              <div class="ai-summary-header">
-                <span class="ai-summary-badge">TỔNG QUAN ĐÁNH GIÁ TỪ AI AGENT</span>
-              </div>
-              <div class="ai-summary-text" id="aiSummaryText"></div>
-              <div class="ai-suggestions-box" id="aiSuggestionsBox" style="display: none;">
-                <div class="ai-suggestions-title">Gợi ý cải tiến từ AI Agent:</div>
-                <ul class="ai-suggestions-list" id="aiSuggestionsList"></ul>
-              </div>
-            </div>
-
-            <!-- Findings List -->
-            <div class="findings-list-wrapper" id="findingsListWrapper">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-
-          <!-- Tab 2: Tool Traces -->
-          <div class="tab-scroll-body" id="tabToolTraceBody" style="display: none;">
-            <div class="finding-card-item" id="toolTracesContainer">
-              <!-- Populated via JS -->
-            </div>
-          </div>
-
-          <!-- Tab 3: Tasks History from DB -->
-          <div class="tab-scroll-body" id="tabTasksHistoryBody" style="display: none;">
-            <div class="findings-list-wrapper" id="tasksHistoryWrapper">
-              <!-- Populated via JS from real DB tasks -->
-            </div>
-          </div>
-
-          <!-- Tab 4: Interactive AI Chat -->
-          <div class="tab-scroll-body" id="tabChatBody" style="display: none;">
-            <div class="chat-workspace-grid">
-              <div class="chat-sidebar-pane">
-                <div class="chat-sidebar-header">
-                  <span style="font-size: 12px; font-weight: 600;">Hội thoại AI</span>
-                  <button class="btn-nav-secondary" id="btnNewChatConversation" style="padding: 4px 8px; font-size: 11px;">+ Mới</button>
-                </div>
-                <div class="chat-conversations-list" id="chatConversationsList">
-                  <!-- Populated via JS -->
-                </div>
-              </div>
-              <div class="chat-main-pane">
-                <div class="chat-messages-container" id="chatMessagesContainer">
-                  <div style="text-align: center; color: var(--text-muted); margin-top: 40px;">
-                    Hãy bắt đầu trò chuyện với AI Agent về mã nguồn dự án!
-                  </div>
-                </div>
-                <div class="chat-input-bar">
-                  <textarea id="inputChatMessage" class="form-input-control" rows="2" placeholder="Nhập câu hỏi hoặc yêu cầu cho AI Agent... (Enter để gửi)"></textarea>
-                  <button class="btn-nav-action" id="btnSendChatMessage" style="align-self: flex-end;">Gửi</button>
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -434,13 +450,26 @@
         </div>
         <div class="form-field">
           <label class="form-label-text">Ngôn ngữ chính</label>
-          <select class="form-select-control" id="inputProjectLang">
-            <option value="Java">Java</option>
-            <option value="TypeScript">TypeScript / JavaScript</option>
-            <option value="Python">Python</option>
-            <option value="Go">Go</option>
-            <option value="Rust">Rust</option>
-          </select>
+          <input type="text" class="form-input-control" id="inputProjectLang" list="popularLanguagesList" placeholder="Nhập ngôn ngữ bất kỳ (Java, Python, C++, PHP, Dart, Go, v.v.)" value="Java">
+          <datalist id="popularLanguagesList">
+            <option value="Java">
+            <option value="TypeScript">
+            <option value="JavaScript">
+            <option value="Python">
+            <option value="Go">
+            <option value="Rust">
+            <option value="C++">
+            <option value="C#">
+            <option value="PHP">
+            <option value="Kotlin">
+            <option value="Swift">
+            <option value="Dart">
+            <option value="Ruby">
+            <option value="HTML / CSS">
+            <option value="SQL">
+            <option value="Đa ngôn ngữ">
+          </datalist>
+          <div class="field-hint-text">Gợi ý: Bạn có thể chọn từ danh sách hoặc tự nhập ngôn ngữ/framework bất kỳ.</div>
         </div>
         <div class="form-field">
           <label class="form-label-text">Mô tả dự án (Tùy chọn)</label>
@@ -492,7 +521,6 @@
             <option value="">Mặc định hệ thống (Gemini 3.5 Flash Lite - Siêu tốc & 500 RPD)</option>
             <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (Khuyên dùng - 500 RPD Free)</option>
             <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Thế hệ mới - Siêu tốc & 500 RPD)</option>
-            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (Ổn định - Tối ưu Token)</option>
             <option value="gemini-2.5-flash">Gemini 2.5 Flash (Lập luận sâu & Review phức tạp)</option>
           </select>
         </div>
@@ -560,6 +588,11 @@
               </svg>
             </button>
           </div>
+        </div>
+        <div style="margin-top: 6px; margin-bottom: 14px;">
+          <button type="button" class="btn-nav-secondary" id="btnQuickLoginAdmin" style="width: 100%; font-size: 12px; padding: 7px 10px; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25); color: #818cf8;">
+            ⚡ Đăng nhập mẫu: admin / admin (Quản trị viên)
+          </button>
         </div>
         <div class="modal-actions-row">
           <button type="button" class="btn-nav-secondary" data-close-modal>Đóng</button>
@@ -780,7 +813,6 @@
           <select class="form-select-control" id="prefModel">
             <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (Mặc định - Siêu tốc & 500 RPD)</option>
             <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Thế hệ mới - Siêu tốc & 500 RPD)</option>
-            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (Ổn định - Tiết kiệm Token)</option>
             <option value="gemini-2.5-flash">Gemini 2.5 Flash (Lập luận sâu & Phân tích phức tạp)</option>
           </select>
         </div>
@@ -825,7 +857,7 @@
           </div>
           <div class="db-diag-item">
             <span class="db-diag-label">Backend API Server</span>
-            <span class="db-diag-val" id="diagBackendUrl">http://localhost:8081</span>
+            <span class="db-diag-val" id="diagBackendUrl">http://localhost:8080</span>
           </div>
           <div class="db-diag-item">
             <span class="db-diag-label">Độ trễ phản hồi (Latency)</span>
@@ -851,205 +883,243 @@
   <!-- MODAL: Admin Management Panel (Bảng điều khiển Quản trị hệ thống cho ADMIN) -->
   <div class="modal-backdrop" id="modalAdminPanel">
     <div class="modal-panel admin-panel-modal">
-      <div class="modal-header-row">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <h3 class="modal-heading">Bảng điều khiển Quản trị viên (Admin)</h3>
-          <span class="account-badge-role" style="background: rgba(16, 185, 129, 0.15); color: var(--diff-add); border: 1px solid rgba(16, 185, 129, 0.3);">Hệ thống</span>
-        </div>
-        <button class="modal-close-btn" data-close-modal>&times;</button>
-      </div>
-
-      <!-- Admin System Statistics (Expanded 8 Metrics) -->
-      <div class="admin-stats-grid">
-        <div class="admin-stat-card">
-          <div class="admin-stat-val" id="adminStatUsers">0</div>
-          <div class="admin-stat-label">Tổng người dùng</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-val" id="adminStatRoles">0 / 0</div>
-          <div class="admin-stat-label">Admin / Thành viên</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-val" id="adminStatProjects">0</div>
-          <div class="admin-stat-label">Tổng dự án CSDL</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-val" id="adminStatTasks">0</div>
-          <div class="admin-stat-label">Tổng tác vụ AI</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-val" id="adminStatCompleted" style="color: var(--diff-add);">0</div>
-          <div class="admin-stat-label">Tác vụ hoàn thành</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-val" id="adminStatPending" style="color: #f59e0b;">0</div>
-          <div class="admin-stat-label">Đang chạy / Chờ</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-val" id="adminStatFailed" style="color: var(--diff-del);">0</div>
-          <div class="admin-stat-label">Tác vụ lỗi</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-val" id="adminStatTypes" style="font-size: 15px; padding-top: 4px;">0 / 0 / 0</div>
-          <div class="admin-stat-label">Review / Fix / Test</div>
-        </div>
-      </div>
-
-      <!-- Admin Navigation Tabs -->
-      <div class="view-tabs-bar" style="margin-bottom: 16px;">
-        <div class="view-tab-btn active" id="adminTabUsers">Người dùng & Khóa</div>
-        <div class="view-tab-btn" id="adminTabTools">Bật/Tắt Công cụ</div>
-        <div class="view-tab-btn" id="adminTabSettings">Model & API Key</div>
-        <div class="view-tab-btn" id="adminTabTasks">Tác vụ & Lỗi hệ thống</div>
-        <div class="view-tab-btn" id="adminTabAudit">Nhật ký Kiểm toán (Audit)</div>
-      </div>
-
-      <!-- PANE 1: User Accounts & Lock/Unlock -->
-      <div class="admin-tab-pane" id="adminPaneUsers">
-        <div class="admin-section-header">
-          <div>
-            <h4 class="admin-section-title">Danh sách tài khoản trong CSDL MySQL</h4>
-            <p class="admin-section-sub">Phân quyền, khóa/mở khóa tài khoản và kiểm duyệt tác vụ thành viên</p>
+      <div class="admin-modal-top">
+        <div class="modal-header-row" style="margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <h3 class="modal-heading">Bảng điều khiển Quản trị viên (Admin)</h3>
+            <span class="account-badge-role" style="background: rgba(16, 185, 129, 0.15); color: var(--diff-add); border: 1px solid rgba(16, 185, 129, 0.3);">Hệ thống</span>
           </div>
-          <button type="button" class="btn-diag-refresh" id="btnRefreshAdminData">Làm mới dữ liệu</button>
+          <button class="modal-close-btn" data-close-modal>&times;</button>
         </div>
 
-        <div class="admin-users-table-wrap">
-          <table class="admin-users-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Tên đăng nhập</th>
-                <th>Email</th>
-                <th>Vai trò</th>
-                <th>Trạng thái</th>
-                <th>Dự án / Tác vụ</th>
-                <th>Ngày tạo</th>
-                <th style="text-align: right;">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="adminUsersTableBody">
-              <tr>
-                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải danh sách tài khoản từ CSDL...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- PANE 2: Agent Tools Toggling -->
-      <div class="admin-tab-pane" id="adminPaneTools" style="display: none;">
-        <div class="admin-section-header">
-          <div>
-            <h4 class="admin-section-title">Quản lý Bật / Tắt Công cụ Agent (Tools)</h4>
-            <p class="admin-section-sub">Kiểm soát các công cụ hệ thống mà Agent được phép gọi khi thực thi tác vụ</p>
+        <!-- Admin System Statistics (Expanded 8 Metrics) -->
+        <div class="admin-stats-grid">
+          <div class="admin-stat-card">
+            <div class="admin-stat-val" id="adminStatUsers">0</div>
+            <div class="admin-stat-label">Tổng người dùng</div>
           </div>
-          <button type="button" class="btn-diag-refresh" id="btnRefreshAdminTools">Làm mới công cụ</button>
-        </div>
-
-        <div id="adminToolsListContainer" style="display: flex; flex-direction: column; gap: 8px;">
-          <!-- Dynamically populated via JS -->
-        </div>
-      </div>
-
-      <!-- PANE 3: System Settings & Model / API Key -->
-      <div class="admin-tab-pane" id="adminPaneSettings" style="display: none;">
-        <div class="admin-section-header">
-          <div>
-            <h4 class="admin-section-title">Cấu hình Mô hình & Khóa API Gemini</h4>
-            <p class="admin-section-sub">Cấu hình model Gemini mặc định và thay đổi API Key hệ thống</p>
+          <div class="admin-stat-card">
+            <div class="admin-stat-val" id="adminStatRoles">0 / 0</div>
+            <div class="admin-stat-label">Admin / Thành viên</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-val" id="adminStatProjects">0</div>
+            <div class="admin-stat-label">Tổng dự án CSDL</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-val" id="adminStatTasks">0</div>
+            <div class="admin-stat-label">Tổng tác vụ AI</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-val" id="adminStatCompleted" style="color: var(--diff-add);">0</div>
+            <div class="admin-stat-label">Tác vụ hoàn thành</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-val" id="adminStatPending" style="color: #f59e0b;">0</div>
+            <div class="admin-stat-label">Đang chạy / Chờ</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-val" id="adminStatFailed" style="color: var(--diff-del);">0</div>
+            <div class="admin-stat-label">Tác vụ lỗi</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-val" id="adminStatTypes" style="font-size: 15px; padding-top: 4px;">0 / 0 / 0</div>
+            <div class="admin-stat-label">Review / Fix / Test</div>
           </div>
         </div>
+      </div>
 
-        <div style="background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-          <form id="formAdminModelConfig" style="margin-bottom: 16px;">
-            <div class="form-field">
-              <label class="form-label-text">Mô hình Gemini hoạt động (Active Model)</label>
-              <div style="display: flex; gap: 8px;">
-                <input type="text" class="form-input-control" id="inputAdminActiveModel" placeholder="gemini-3.5-flash-lite" required>
-                <button type="submit" class="btn-nav-action" style="white-space: nowrap;">Lưu Model</button>
-              </div>
-              <div class="field-hint-text">Gợi ý 3 model tối ưu: gemini-3.5-flash-lite (Mặc định - 500 RPD), gemini-3.1-flash-lite (500 RPD), gemini-2.5-flash-lite, gemini-2.5-flash</div>
+      <!-- Sticky Anchor Navigation Tabs Shelf -->
+      <div class="view-tabs-bar admin-sticky-nav" id="adminStickyNav">
+        <div class="admin-nav-buttons-wrap">
+        <button type="button" class="view-tab-btn active" data-scroll-to="adminSectionUsers">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          Người dùng & Khóa
+        </button>
+        <button type="button" class="view-tab-btn" data-scroll-to="adminSectionTools">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+          Bật/Tắt Công cụ
+        </button>
+        <button type="button" class="view-tab-btn" data-scroll-to="adminSectionSettings">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Model & API Key
+        </button>
+        <button type="button" class="view-tab-btn" data-scroll-to="adminSectionTasks">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          Tác vụ & Lỗi hệ thống
+        </button>
+        <button type="button" class="view-tab-btn" data-scroll-to="adminSectionAudit">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          Nhật ký Kiểm toán (Audit)
+        </button>
+        </div>
+        <button type="button" class="modal-close-btn admin-sticky-close-btn" data-close-modal title="Đóng bảng quản trị">&times;</button>
+      </div>
+
+      <!-- Single Scrollable Body Containing All 5 Sections -->
+      <div class="admin-scroll-body">
+        <!-- SECTION 1: User Accounts & Lock/Unlock -->
+        <section class="admin-scroll-section" id="adminSectionUsers">
+          <div class="admin-section-header">
+            <div>
+              <h4 class="admin-section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                1. Danh sách tài khoản trong CSDL MySQL
+              </h4>
+              <p class="admin-section-sub">Phân quyền, khóa/mở khóa tài khoản và kiểm duyệt tác vụ thành viên</p>
             </div>
-          </form>
+            <button type="button" class="btn-diag-refresh" id="btnRefreshAdminData">Làm mới dữ liệu</button>
+          </div>
 
-          <form id="formAdminKeyConfig">
-            <div class="form-field">
-              <label class="form-label-text">Google Gemini API Key</label>
-              <div style="display: flex; gap: 8px;">
-                <input type="password" class="form-input-control" id="inputAdminGeminiKey" placeholder="Nhập API Key mới để cập nhật..." required>
-                <button type="submit" class="btn-nav-action" style="white-space: nowrap;">Cập nhật Key</button>
-              </div>
-              <div class="field-hint-text" id="adminCurrentKeyHint">Trạng thái Key: Đang kiểm tra...</div>
+          <div class="admin-users-table-wrap">
+            <table class="admin-users-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Tên đăng nhập</th>
+                  <th>Email</th>
+                  <th>Vai trò</th>
+                  <th>Trạng thái</th>
+                  <th>Dự án / Tác vụ</th>
+                  <th>Ngày tạo</th>
+                  <th style="text-align: right;">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersTableBody">
+                <tr>
+                  <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải danh sách tài khoản từ CSDL...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SECTION 2: Agent Tools Toggling -->
+        <section class="admin-scroll-section" id="adminSectionTools">
+          <div class="admin-section-header">
+            <div>
+              <h4 class="admin-section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+                2. Quản lý Bật / Tắt Công cụ Agent (Tools)
+              </h4>
+              <p class="admin-section-sub">Kiểm soát các công cụ hệ thống mà Agent được phép gọi khi thực thi tác vụ</p>
             </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- PANE 4: System Tasks & Error Logs -->
-      <div class="admin-tab-pane" id="adminPaneTasks" style="display: none;">
-        <div class="admin-section-header">
-          <div>
-            <h4 class="admin-section-title">Lịch sử Tác vụ Toàn hệ thống & Log lỗi</h4>
-            <p class="admin-section-sub">Giám sát trạng thái thực thi tất cả tác vụ AI của mọi người dùng</p>
+            <button type="button" class="btn-diag-refresh" id="btnRefreshAdminTools">Làm mới công cụ</button>
           </div>
-          <button type="button" class="btn-diag-refresh" id="btnRefreshAdminTasks">Làm mới tác vụ</button>
-        </div>
 
-        <div class="admin-users-table-wrap" style="max-height: 320px; overflow-y: auto;">
-          <table class="admin-users-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Người dùng</th>
-                <th>Dự án</th>
-                <th>Loại</th>
-                <th>Trạng thái</th>
-                <th>Thời gian</th>
-                <th>Lỗi / Ghi chú</th>
-              </tr>
-            </thead>
-            <tbody id="adminSystemTasksTableBody">
-              <tr>
-                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải danh sách tác vụ...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- PANE 5: Audit Logs -->
-      <div class="admin-tab-pane" id="adminPaneAudit" style="display: none;">
-        <div class="admin-section-header">
-          <div>
-            <h4 class="admin-section-title">Nhật ký Kiểm toán Hệ thống (Audit Log)</h4>
-            <p class="admin-section-sub">Ghi vết các hành động quan trọng của người dùng và quản trị viên (Chỉ Admin đọc)</p>
+          <div id="adminToolsListContainer" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Dynamically populated via JS -->
           </div>
-          <button type="button" class="btn-diag-refresh" id="btnRefreshAdminAudit">Làm mới Audit Log</button>
-        </div>
+        </section>
 
-        <div class="admin-users-table-wrap" style="max-height: 320px; overflow-y: auto;">
-          <table class="admin-users-table">
-            <thead>
-              <tr>
-                <th>Thời gian</th>
-                <th>Tài khoản</th>
-                <th>Hành động</th>
-                <th>Chi tiết</th>
-                <th>Địa chỉ IP</th>
-              </tr>
-            </thead>
-            <tbody id="adminAuditTableBody">
-              <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải nhật ký kiểm toán...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <!-- SECTION 3: System Settings & Model / API Key -->
+        <section class="admin-scroll-section" id="adminSectionSettings">
+          <div class="admin-section-header">
+            <div>
+              <h4 class="admin-section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                3. Cấu hình Mô hình & Khóa API Gemini
+              </h4>
+              <p class="admin-section-sub">Cấu hình model Gemini mặc định và thay đổi API Key hệ thống</p>
+            </div>
+          </div>
 
-      <div class="modal-actions-row">
-        <button type="button" class="btn-nav-secondary" data-close-modal>Đóng</button>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-main); border-radius: 8px; padding: 16px;">
+            <form id="formAdminModelConfig" style="margin-bottom: 16px;">
+              <div class="form-field">
+                <label class="form-label-text">Mô hình Gemini hoạt động (Active Model)</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" class="form-input-control" id="inputAdminActiveModel" placeholder="gemini-3.5-flash-lite" required>
+                  <button type="submit" class="btn-nav-action" style="white-space: nowrap;">Lưu Model</button>
+                </div>
+                <div class="field-hint-text">Gợi ý 3 model tối ưu: gemini-3.5-flash-lite (Mặc định - 500 RPD), gemini-3.1-flash-lite (500 RPD), gemini-2.5-flash</div>
+              </div>
+            </form>
+
+            <form id="formAdminKeyConfig">
+              <div class="form-field">
+                <label class="form-label-text">Google Gemini API Key</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="password" class="form-input-control" id="inputAdminGeminiKey" placeholder="Nhập API Key mới để cập nhật..." required>
+                  <button type="submit" class="btn-nav-action" style="white-space: nowrap;">Cập nhật Key</button>
+                </div>
+                <div class="field-hint-text" id="adminCurrentKeyHint">Trạng thái Key: Đang kiểm tra...</div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- SECTION 4: System Tasks & Error Logs -->
+        <section class="admin-scroll-section" id="adminSectionTasks">
+          <div class="admin-section-header">
+            <div>
+              <h4 class="admin-section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                4. Lịch sử Tác vụ Toàn hệ thống & Log lỗi
+              </h4>
+              <p class="admin-section-sub">Giám sát trạng thái thực thi tất cả tác vụ AI của mọi người dùng</p>
+            </div>
+            <button type="button" class="btn-diag-refresh" id="btnRefreshAdminTasks">Làm mới tác vụ</button>
+          </div>
+
+          <div class="admin-users-table-wrap" style="max-height: 320px; overflow-y: auto;">
+            <table class="admin-users-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Người dùng</th>
+                  <th>Dự án</th>
+                  <th>Loại</th>
+                  <th>Trạng thái</th>
+                  <th>Thời gian</th>
+                  <th>Lỗi / Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody id="adminSystemTasksTableBody">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải danh sách tác vụ...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SECTION 5: Audit Logs -->
+        <section class="admin-scroll-section" id="adminSectionAudit">
+          <div class="admin-section-header">
+            <div>
+              <h4 class="admin-section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                5. Nhật ký Kiểm toán Hệ thống (Audit Log)
+              </h4>
+              <p class="admin-section-sub">Ghi vết các hành động quan trọng của người dùng và quản trị viên (Chỉ Admin đọc)</p>
+            </div>
+            <button type="button" class="btn-diag-refresh" id="btnRefreshAdminAudit">Làm mới Audit Log</button>
+          </div>
+
+          <div class="admin-users-table-wrap" style="max-height: 320px; overflow-y: auto;">
+            <table class="admin-users-table">
+              <thead>
+                <tr>
+                  <th>Thời gian</th>
+                  <th>Tài khoản</th>
+                  <th>Hành động</th>
+                  <th>Chi tiết</th>
+                  <th>Địa chỉ IP</th>
+                </tr>
+              </thead>
+              <tbody id="adminAuditTableBody">
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải nhật ký kiểm toán...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="modal-actions-row" style="margin-top: 8px;">
+          <button type="button" class="btn-nav-secondary" data-close-modal>Đóng Bảng Quản Trị</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1113,7 +1183,13 @@
     </div>
   </div>
 
-  <!-- Scripts -->
+  <!-- Frontend Modules -->
+  <script src="js/modules/markdownUtils.js"></script>
+  <script src="js/modules/state.js"></script>
+  <script src="js/modules/projectView.js"></script>
+  <script src="js/modules/chatView.js"></script>
+  <script src="js/modules/adminView.js"></script>
+  <!-- API Client & Application Bootstrap -->
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -32,9 +32,6 @@ build/
 ### VS Code ###
 .vscode/
 
-### Desktop App ###
-desktop/node_modules/
-desktop/dist/
 
 ### Secrets & Local Environment ###
 .env

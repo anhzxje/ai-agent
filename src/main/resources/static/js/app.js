@@ -19,15 +19,20 @@
 (function() {
   // App State
   const state = {
-    view: "welcome", // "welcome" | "workspace"
+    view: "welcome", // "welcome" | "chat" | "workspace"
     projects: [],
     tasks: [],
     pinnedTasks: [],
+    conversations: [],
+    activeConversationId: null,
+    activeConversation: null,
+    isChatSending: false,
     activeProject: null,
     activeTask: null,
     activeTab: "findings",
     currentUser: window.apiClient.getCurrentUser(),
-    theme: localStorage.getItem("ai_agent_theme") || "light"
+    theme: localStorage.getItem("ai_agent_theme") || "light",
+    expandedProjectIds: new Set()
   };
 
   // DOM Elements
@@ -36,6 +41,36 @@
     landingView: document.getElementById("landingView"),
     welcomeView: document.getElementById("welcomeView"),
     workspaceView: document.getElementById("workspaceView"),
+    chatAssistantView: document.getElementById("chatAssistantView"),
+    navModePills: document.getElementById("navModePills"),
+    btnModeChat: document.getElementById("btnModeChat"),
+    btnModeReview: document.getElementById("btnModeReview"),
+    sectionSidebarConversations: document.getElementById("sectionSidebarConversations"),
+    btnSidebarNewChat: document.getElementById("btnSidebarNewChat"),
+    sidebarConversationsContainer: document.getElementById("sidebarConversationsContainer"),
+    activeChatTitle: document.getElementById("activeChatTitle"),
+    chatWorkspaceName: document.getElementById("chatWorkspaceName"),
+    chatWorkspacePath: document.getElementById("chatWorkspacePath"),
+    btnSwitchWorkspace: document.getElementById("btnSwitchWorkspace"),
+    btnDeleteActiveProject: document.getElementById("btnDeleteActiveProject"),
+    btnChatBackHome: document.getElementById("btnChatBackHome"),
+    selectChatProject: document.getElementById("selectChatProject"),
+    chatModelBadge: document.getElementById("chatModelBadge"),
+    selectChatModel: document.getElementById("selectChatModel"),
+    btnHeaderNewChat: document.getElementById("btnHeaderNewChat"),
+    btnDeleteActiveChat: document.getElementById("btnDeleteActiveChat"),
+    chatStreamArea: document.getElementById("chatStreamArea"),
+    chatEmptyState: document.getElementById("chatEmptyState"),
+    emptyStateTitle: document.getElementById("emptyStateTitle"),
+    emptyStateDesc: document.getElementById("emptyStateDesc"),
+    chatMessagesList: document.getElementById("chatMessagesList"),
+    chatTypingIndicator: document.getElementById("chatTypingIndicator"),
+    chatTypingText: document.getElementById("chatTypingText"),
+    centralChatTextarea: document.getElementById("centralChatTextarea"),
+    btnSendCentralChat: document.getElementById("btnSendCentralChat"),
+    chatProjectHintText: document.getElementById("chatProjectHintText"),
+    welcomeProjectsGrid: document.getElementById("welcomeProjectsGrid"),
+    welcomeProjectsCount: document.getElementById("welcomeProjectsCount"),
     btnLandingLogin: document.getElementById("btnLandingLogin"),
     btnLandingRegister: document.getElementById("btnLandingRegister"),
     sectionPinnedTasks: document.getElementById("sectionPinnedTasks"),
@@ -162,24 +197,9 @@
     inspectProjectsContainer: document.getElementById("inspectProjectsContainer")
   };
 
-  // Helper: Format real relative time from database ISO timestamp
+  // Helper: Format real relative time (Delegated to ProjectView)
   function formatRelativeTime(dateString) {
-    if (!dateString) return "vừa xong";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "vừa xong";
-
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.max(0, Math.floor(diffMs / 1000));
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-
-    if (diffSec < 60) return "vừa xong";
-    if (diffMin < 60) return `${diffMin}m`;
-    if (diffHour < 24) return `${diffHour}h`;
-    if (diffDay < 30) return `${diffDay}d`;
-    return date.toLocaleDateString("vi-VN");
+    return window.ProjectView ? window.ProjectView.formatRelativeTime(dateString) : "vừa xong";
   }
 
   // Theme Management
@@ -187,20 +207,22 @@
     state.theme = theme;
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("ai_agent_theme", theme);
-    if (theme === "dark") {
-      el.themeIcon.innerHTML = `
-        <circle cx="12" cy="12" r="5"></circle>
-        <line x1="12" y1="1" x2="12" y2="3"></line>
-        <line x1="12" y1="21" x2="12" y2="23"></line>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-        <line x1="1" y1="12" x2="3" y2="12"></line>
-        <line x1="21" y1="12" x2="23" y2="12"></line>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-      `;
-    } else {
-      el.themeIcon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>`;
+    if (el.themeIcon) {
+      if (theme === "dark") {
+        el.themeIcon.innerHTML = `
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        `;
+      } else {
+        el.themeIcon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>`;
+      }
     }
   }
 
@@ -274,6 +296,31 @@
     }
   }
 
+  // Helper: Clear Chat Session State on Logout / Account Switch
+  function clearChatSessionState() {
+    state.activeConversationId = null;
+    state.activeConversation = null;
+    state.conversations = [];
+    state.activeProject = null;
+    state.expandedProjectIds.clear();
+
+    if (el.chatMessagesList) el.chatMessagesList.innerHTML = "";
+    if (el.chatEmptyState) el.chatEmptyState.style.display = "flex";
+    if (el.activeChatTitle) el.activeChatTitle.textContent = state.activeProject ? state.activeProject.name : "Hỏi đáp chung";
+    if (el.chatWorkspaceName) el.chatWorkspaceName.textContent = state.activeProject ? state.activeProject.name : "Hỏi đáp chung";
+    if (el.chatWorkspaceBadge) el.chatWorkspaceBadge.title = state.activeProject ? `Thư mục: ${state.activeProject.path || state.activeProject.name}` : "Hỏi đáp chung (Không gắn dự án)";
+    if (el.chatWorkspacePath) {
+      el.chatWorkspacePath.textContent = "";
+      el.chatWorkspacePath.style.display = "none";
+    }
+    if (el.btnDeleteActiveProject) el.btnDeleteActiveProject.style.display = "none";
+    if (el.btnSelectWorkspace) el.btnSelectWorkspace.style.display = "none";
+    if (el.centralChatTextarea) el.centralChatTextarea.value = "";
+    if (el.chatProjectHintText) el.chatProjectHintText.textContent = "Enter để gửi • Shift+Enter xuống dòng";
+    if (el.emptyStateTitle) el.emptyStateTitle.textContent = "Soopi AI Coding Assistant";
+    if (el.emptyStateDesc) el.emptyStateDesc.textContent = "Không gian làm việc trực tiếp trên dự án. Chọn hoặc mở dự án để AI đọc mã nguồn và thực thi các tính năng chuyên sâu.";
+  }
+
   // Helper: Perform safe logout
   function performLogout() {
     const confirmed = confirm("Bạn có chắc chắn muốn đăng xuất khỏi tài khoản Soopi không?");
@@ -284,8 +331,7 @@
     state.projects = [];
     state.tasks = [];
     state.pinnedTasks = [];
-    state.activeProject = null;
-    state.activeTask = null;
+    clearChatSessionState();
     state.view = "landing";
     closeModals();
     updateUserDisplays();
@@ -308,7 +354,7 @@
       if (el.diagStatusTitle) el.diagStatusTitle.textContent = "CSDL MySQL: Đã kết nối (Sẵn sàng)";
       if (el.diagStatusSub) el.diagStatusSub.textContent = "Hệ thống cơ sở dữ liệu quan hệ lưu trữ thực thể dự án và kết quả tác tử AI";
       if (el.diagLatencyVal) el.diagLatencyVal.textContent = `${pingResult.latency} ms`;
-      if (el.diagBackendUrl) el.diagBackendUrl.textContent = pingResult.url || "http://localhost:8081";
+      if (el.diagBackendUrl) el.diagBackendUrl.textContent = pingResult.url || "http://localhost:8080";
       if (el.diagDbHost) el.diagDbHost.textContent = "localhost:3306";
       if (el.diagDbName) el.diagDbName.textContent = "ai_agent (MySQL 8.0+)";
     } else {
@@ -319,560 +365,95 @@
     }
   }
 
-  // Admin Dashboard Modal Handlers (Role ADMIN: Stats & User Management)
+  // Admin Dashboard Modal Handlers (Delegated to AdminView module)
   async function openAdminPanelModal() {
-    if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
-      alert("Bạn không có quyền quản trị viên (ADMIN) để truy cập tính năng này.");
-      return;
-    }
-    openModal(el.modalAdminPanel);
-    await loadAdminDashboardData();
+    return window.AdminView.openAdminPanelModal(el, state, window.apiClient, openModal);
   }
 
   async function loadAdminDashboardData() {
-    if (el.adminUsersTableBody) {
-      el.adminUsersTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải danh sách tài khoản từ CSDL...</td></tr>`;
-    }
-
-    try {
-      const [stats, users] = await Promise.all([
-        window.apiClient.getAdminStats(),
-        window.apiClient.getAdminUsers()
-      ]);
-
-      if (stats) {
-        if (el.adminStatUsers) el.adminStatUsers.textContent = stats.totalUsers ?? 0;
-        if (el.adminStatRoles) el.adminStatRoles.textContent = `${stats.totalAdmins ?? 1} / ${stats.totalRegularUsers ?? 0}`;
-        if (el.adminStatProjects) el.adminStatProjects.textContent = stats.totalProjects ?? 0;
-        if (el.adminStatTasks) el.adminStatTasks.textContent = stats.totalTasks ?? 0;
-        if (el.adminStatCompleted) el.adminStatCompleted.textContent = stats.completedTasks ?? 0;
-        if (el.adminStatPending) el.adminStatPending.textContent = stats.pendingOrProcessingTasks ?? 0;
-        if (el.adminStatFailed) el.adminStatFailed.textContent = stats.failedTasks ?? 0;
-        if (el.adminStatTypes) el.adminStatTypes.textContent = `${stats.reviewTasksCount ?? 0} Rev / ${stats.fixTasksCount ?? 0} Fix / ${stats.testGenTasksCount ?? 0} Test`;
-
-        // Update Command Center Badges on Welcome View
-        if (el.quickStatUsersBadge) el.quickStatUsersBadge.textContent = `${stats.totalUsers ?? 0} Người dùng (${stats.totalAdmins ?? 1} Admin)`;
-        if (el.quickStatProjectsBadge) el.quickStatProjectsBadge.textContent = `${stats.totalProjects ?? 0} Dự án toàn CSDL`;
-        if (el.quickStatTasksBadge) el.quickStatTasksBadge.textContent = `${stats.totalTasks ?? 0} Tác vụ AI (${stats.completedTasks ?? 0} hoàn thành)`;
-      }
-
-      if (users && users.length > 0) {
-        if (el.adminUsersTableBody) {
-          el.adminUsersTableBody.innerHTML = users.map(u => {
-            const roleClass = u.role === 'ADMIN' ? 'badge-role-admin' : 'badge-role-user';
-            const dateStr = u.createdAt ? new Date(u.createdAt).toLocaleString('vi-VN') : 'Mặc định';
-            const isSelf = state.currentUser && state.currentUser.username === u.username;
-            const lockStatusHtml = u.isLocked 
-              ? `<span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">Đã khóa</span>` 
-              : `<span style="background: rgba(16, 185, 129, 0.15); color: var(--diff-add); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">Hoạt động</span>`;
-
-            return `
-              <tr>
-                <td style="font-family: var(--font-mono); font-weight: 600;">#${u.id}</td>
-                <td>
-                  <strong>${u.username}</strong>
-                  ${isSelf ? '<span style="font-size: 10px; margin-left: 4px; opacity: 0.6;">(Bạn)</span>' : ''}
-                </td>
-                <td style="color: var(--text-secondary);">${u.email || '-'}</td>
-                <td><span class="${roleClass}">${u.role}</span></td>
-                <td>${lockStatusHtml}</td>
-                <td>
-                  <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--text-secondary);">
-                    ${u.projectCount || 0} dự án • ${u.taskCount || 0} tác vụ
-                  </span>
-                </td>
-                <td style="color: var(--text-muted); font-size: 11.5px;">${dateStr}</td>
-                <td style="text-align: right; white-space: nowrap;">
-                  <button type="button" class="btn-table-action primary" data-action="inspect-user" data-user-id="${u.id}" data-username="${u.username}" data-email="${u.email || ''}" data-role="${u.role}" title="Thanh tra nhật ký chat & tác vụ của tài khoản này">
-                    Kiểm duyệt
-                  </button>
-                  ${isSelf ? '' : `
-                    <button type="button" class="btn-table-action ${u.isLocked ? 'primary' : 'danger'}" data-action="toggle-lock" data-user-id="${u.id}" data-username="${u.username}" data-locked="${u.isLocked}">
-                      ${u.isLocked ? 'Mở khóa' : 'Khóa'}
-                    </button>
-                  `}
-                  <button type="button" class="btn-table-action" data-action="toggle-role" data-user-id="${u.id}" data-username="${u.username}" data-role="${u.role}" title="Chuyển đổi vai trò USER / ADMIN" ${isSelf ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : ''}>
-                    ${u.role === 'ADMIN' ? 'Hạ USER' : 'Lên ADMIN'}
-                  </button>
-                  ${isSelf ? '' : `
-                    <button type="button" class="btn-table-action danger" data-action="delete-user" data-user-id="${u.id}" data-username="${u.username}" title="Xóa tài khoản này">
-                      Xóa
-                    </button>
-                  `}
-                </td>
-              </tr>
-            `;
-          }).join("");
-
-          // Event Listeners for User Table Actions
-          el.adminUsersTableBody.querySelectorAll("[data-action='inspect-user']").forEach(btn => {
-            btn.addEventListener("click", () => {
-              const uId = Number(btn.getAttribute("data-user-id"));
-              const username = btn.getAttribute("data-username");
-              const email = btn.getAttribute("data-email");
-              const role = btn.getAttribute("data-role");
-              openInspectUserModal({ id: uId, username, email, role });
-            });
-          });
-
-          el.adminUsersTableBody.querySelectorAll("[data-action='toggle-lock']").forEach(btn => {
-            btn.addEventListener("click", async () => {
-              const uId = Number(btn.getAttribute("data-user-id"));
-              const username = btn.getAttribute("data-username");
-              const isLocked = btn.getAttribute("data-locked") === "true";
-              const actionName = isLocked ? "mở khóa" : "khóa";
-              if (confirm(`Bạn có chắc muốn ${actionName} tài khoản "${username}" không?`)) {
-                try {
-                  if (isLocked) {
-                    await window.apiClient.unlockUser(uId);
-                  } else {
-                    await window.apiClient.lockUser(uId);
-                  }
-                  await loadAdminDashboardData();
-                } catch (err) {
-                  alert("Lỗi khi thay đổi trạng thái khóa: " + err.message);
-                }
-              }
-            });
-          });
-
-          el.adminUsersTableBody.querySelectorAll("[data-action='toggle-role']").forEach(btn => {
-            btn.addEventListener("click", async () => {
-              const uId = Number(btn.getAttribute("data-user-id"));
-              const username = btn.getAttribute("data-username");
-              const currentRole = btn.getAttribute("data-role");
-              const nextRole = currentRole === 'ADMIN' ? 'USER' : 'ADMIN';
-
-              if (confirm(`Bạn có chắc muốn đổi vai trò của tài khoản "${username}" thành ${nextRole} không?`)) {
-                try {
-                  await window.apiClient.updateUserRole(uId, nextRole);
-                  await loadAdminDashboardData();
-                } catch (err) {
-                  alert("Lỗi khi cập nhật vai trò: " + err.message);
-                }
-              }
-            });
-          });
-
-          el.adminUsersTableBody.querySelectorAll("[data-action='delete-user']").forEach(btn => {
-            btn.addEventListener("click", async () => {
-              const uId = Number(btn.getAttribute("data-user-id"));
-              const username = btn.getAttribute("data-username");
-
-              if (confirm(`CẢNH BÁO QUẢN TRỊ:\nBạn có chắc chắn muốn xóa vĩnh viễn tài khoản "${username}" cùng toàn bộ dự án và tác vụ AI liên quan không?`)) {
-                try {
-                  await window.apiClient.deleteUser(uId);
-                  await loadAdminDashboardData();
-                } catch (err) {
-                  alert("Lỗi khi xóa tài khoản: " + err.message);
-                }
-              }
-            });
-          });
-        }
-      } else {
-        if (el.adminUsersTableBody) {
-          el.adminUsersTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">Không tìm thấy tài khoản người dùng nào.</td></tr>`;
-        }
-      }
-    } catch (e) {
-      console.error("Lỗi khi tải dữ liệu quản trị:", e);
-      if (el.adminUsersTableBody) {
-        el.adminUsersTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi kết nối máy chủ quản trị: ${e.message}</td></tr>`;
-      }
-    }
+    return window.AdminView.loadAdminDashboardData(el, state, window.apiClient);
   }
 
-  // Open and load User Inspection (Admin Audit) Modal
   async function openInspectUserModal(user) {
-    if (el.inspectUserAvatar) el.inspectUserAvatar.textContent = (user.username || '?').charAt(0).toUpperCase();
-    if (el.inspectUsername) el.inspectUsername.textContent = user.username || "Thành viên";
-    if (el.inspectUserRole) el.inspectUserRole.textContent = user.role || "USER";
-    if (el.inspectUserId) el.inspectUserId.textContent = `#${user.id}`;
-    if (el.inspectUserEmail) el.inspectUserEmail.textContent = user.email || `${user.username}@test.com`;
-
-    if (el.inspectTasksContainer) {
-      el.inspectTasksContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">Đang tải nhật ký tác vụ và lịch sử chat từ CSDL...</div>`;
-    }
-    if (el.inspectProjectsContainer) {
-      el.inspectProjectsContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">Đang tải danh sách dự án...</div>`;
-    }
-
-    if (el.tabInspectTasks) el.tabInspectTasks.click();
-    openModal(el.modalAdminInspectUser);
-
-    try {
-      const [userTasks, userProjects] = await Promise.all([
-        window.apiClient.getUserTasksForAdmin(user.id),
-        window.apiClient.getUserProjectsForAdmin(user.id)
-      ]);
-
-      if (el.inspectTasksCount) el.inspectTasksCount.textContent = userTasks ? userTasks.length : 0;
-      if (el.inspectProjectsCount) el.inspectProjectsCount.textContent = userProjects ? userProjects.length : 0;
-
-      // Render tasks
-      if (el.inspectTasksContainer) {
-        if (!userTasks || userTasks.length === 0) {
-          el.inspectTasksContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">Tài khoản này chưa tạo tác vụ AI hoặc phiên trò chuyện nào trong CSDL.</div>`;
-        } else {
-          el.inspectTasksContainer.innerHTML = userTasks.map(t => {
-            const dateStr = t.createdAt ? new Date(t.createdAt).toLocaleString('vi-VN') : 'Vừa xong';
-            let summaryText = "";
-            if (t.output) {
-              try {
-                const parsed = typeof t.output === "string" ? JSON.parse(t.output) : t.output;
-                const extracted = parsed.summary || parsed.description || parsed.message || (typeof parsed === 'string' ? parsed : JSON.stringify(parsed));
-                summaryText = typeof extracted === 'string' ? extracted : JSON.stringify(extracted);
-              } catch (_) {
-                summaryText = typeof t.output === 'string' ? t.output : JSON.stringify(t.output);
-              }
-            } else if (t.errorMessage) {
-              summaryText = `Lỗi: ${t.errorMessage}`;
-            } else {
-              summaryText = `(Trạng thái: ${t.status || 'Chưa có kết quả'})`;
-            }
-
-            if (typeof summaryText !== 'string') {
-              summaryText = String(summaryText || '');
-            }
-
-            return `
-              <div class="inspect-task-card">
-                <div class="inspect-task-head">
-                  <span class="task-type-pill" style="font-size: 10px;">${t.type || 'TASK'}</span>
-                  <span class="severity-tag ${t.status === 'COMPLETED' ? 'LOW' : 'HIGH'}">${t.status}</span>
-                </div>
-                <div class="inspect-task-title">Tác vụ #${t.id}: ${t.projectName || 'Dự án'}</div>
-                <div class="inspect-task-meta">Khởi tạo: ${dateStr} • Người sở hữu: ${user.username}</div>
-                <div class="inspect-task-body">${summaryText.substring(0, 300)}${summaryText.length > 300 ? '...' : ''}</div>
-              </div>
-            `;
-          }).join("");
-        }
-      }
-
-      // Render projects
-      if (el.inspectProjectsContainer) {
-        if (!userProjects || userProjects.length === 0) {
-          el.inspectProjectsContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">Tài khoản này chưa mở dự án nào trong CSDL.</div>`;
-        } else {
-          el.inspectProjectsContainer.innerHTML = userProjects.map(p => `
-            <div class="inspect-task-card">
-              <div class="inspect-task-head">
-                <span class="task-type-pill" style="font-size: 10px;">${p.language || 'Code'}</span>
-                <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">#${p.id}</span>
-              </div>
-              <div class="inspect-task-title">${p.name}</div>
-              <div class="inspect-task-meta">Đường dẫn: <code>${p.path || 'Local'}</code> • Tạo lúc: ${p.createdAt ? new Date(p.createdAt).toLocaleString('vi-VN') : '-'}</div>
-              <div style="font-size: 12px; color: var(--text-secondary);">${p.description || 'Không có mô tả'}</div>
-            </div>
-          `).join("");
-        }
-      }
-    } catch (e) {
-      console.error("Lỗi khi tải kiểm duyệt người dùng:", e);
-      if (el.inspectTasksContainer) {
-        el.inspectTasksContainer.innerHTML = `<div style="text-align: center; color: var(--diff-del); padding: 20px;">Lỗi: ${e.message}</div>`;
-      }
-    }
+    return window.AdminView.openInspectUserModal(user, el, window.apiClient, openModal);
   }
-
-  // ==========================================================================
-  // Admin Tabs & Management Handlers
-  // ==========================================================================
-  let currentAdminTab = "users";
 
   function setupAdminTabs() {
-    const tabs = [
-      { btnId: "adminTabUsers", paneId: "adminPaneUsers", tabName: "users", loader: loadAdminDashboardData },
-      { btnId: "adminTabTools", paneId: "adminPaneTools", tabName: "tools", loader: loadAdminTools },
-      { btnId: "adminTabSettings", paneId: "adminPaneSettings", tabName: "settings", loader: loadAdminSettings },
-      { btnId: "adminTabTasks", paneId: "adminPaneTasks", tabName: "tasks", loader: loadAdminSystemTasks },
-      { btnId: "adminTabAudit", paneId: "adminPaneAudit", tabName: "audit", loader: loadAdminAuditLogs }
-    ];
-
-    tabs.forEach(t => {
-      const btn = document.getElementById(t.btnId);
-      if (btn) {
-        btn.onclick = () => {
-          tabs.forEach(o => {
-            const b = document.getElementById(o.btnId);
-            const p = document.getElementById(o.paneId);
-            if (b) b.classList.toggle("active", o.btnId === t.btnId);
-            if (p) p.style.display = o.btnId === t.btnId ? "block" : "none";
-          });
-          currentAdminTab = t.tabName;
-          t.loader();
-        };
-      }
-    });
-
-    const btnRefreshTools = document.getElementById("btnRefreshAdminTools");
-    if (btnRefreshTools) btnRefreshTools.onclick = loadAdminTools;
-
-    const btnRefreshTasks = document.getElementById("btnRefreshAdminTasks");
-    if (btnRefreshTasks) btnRefreshTasks.onclick = loadAdminSystemTasks;
-
-    const btnRefreshAudit = document.getElementById("btnRefreshAdminAudit");
-    if (btnRefreshAudit) btnRefreshAudit.onclick = loadAdminAuditLogs;
-
-    // Form Model Config
-    const formModel = document.getElementById("formAdminModelConfig");
-    if (formModel) {
-      formModel.onsubmit = async (e) => {
-        e.preventDefault();
-        const model = document.getElementById("inputAdminActiveModel").value.trim();
-        try {
-          await window.apiClient.updateAdminModel(model);
-          alert(`Đã lưu mô hình hoạt động: ${model}`);
-        } catch (err) {
-          alert(`Lỗi cập nhật model: ${err.message}`);
-        }
-      };
-    }
-
-    // Form Key Config
-    const formKey = document.getElementById("formAdminKeyConfig");
-    if (formKey) {
-      formKey.onsubmit = async (e) => {
-        e.preventDefault();
-        const key = document.getElementById("inputAdminGeminiKey").value.trim();
-        try {
-          await window.apiClient.updateAdminGeminiKey(key);
-          alert("Đã cập nhật Gemini API Key thành công!");
-          document.getElementById("inputAdminGeminiKey").value = "";
-          await loadAdminSettings();
-        } catch (err) {
-          alert(`Lỗi cập nhật API Key: ${err.message}`);
-        }
-      };
-    }
+    return window.AdminView.setupAdminTabs(window.apiClient);
   }
 
   async function loadAdminTools() {
-    const container = document.getElementById("adminToolsListContainer");
-    if (!container) return;
-    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải danh sách công cụ...</div>`;
-    try {
-      const tools = await window.apiClient.getAdminTools();
-      if (!tools || tools.length === 0) {
-        container.innerHTML = `<div style="color: var(--text-muted); padding: 16px;">Không có công cụ nào.</div>`;
-        return;
-      }
-      container.innerHTML = tools.map(t => `
-        <div class="tool-switch-card">
-          <div class="tool-switch-info">
-            <div class="tool-switch-name">${t.displayName || t.toolName} <code>(${t.toolName})</code></div>
-            <div class="tool-switch-desc">${t.description || 'Công cụ hệ thống cho phép Agent tự động gọi'}</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" data-tool-name="${t.toolName}" ${t.enabled ? 'checked' : ''}>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      `).join("");
-
-      container.querySelectorAll("input[data-tool-name]").forEach(input => {
-        input.onchange = async () => {
-          const name = input.getAttribute("data-tool-name");
-          try {
-            await window.apiClient.toggleAdminTool(name);
-          } catch (err) {
-            alert(`Lỗi thay đổi trạng thái công cụ: ${err.message}`);
-            input.checked = !input.checked;
-          }
-        };
-      });
-    } catch (err) {
-      container.innerHTML = `<div style="color: var(--diff-del); padding: 16px;">Lỗi tải công cụ: ${err.message}</div>`;
-    }
+    return window.AdminView.loadAdminTools(el, window.apiClient);
   }
 
   async function loadAdminSettings() {
-    const inputModel = document.getElementById("inputAdminActiveModel");
-    const hint = document.getElementById("adminCurrentKeyHint");
-    try {
-      const settings = await window.apiClient.getAdminSettings();
-      if (settings) {
-        if (inputModel) inputModel.value = settings.model || "gemini-3.5-flash-lite";
-        if (hint) hint.textContent = `Trạng thái Key hiện tại: ${settings.geminiApiKeyMasked || 'Chưa thiết lập'}`;
-      }
-    } catch (err) {
-      console.warn("Could not load admin settings", err);
-    }
+    return window.AdminView.loadAdminSettings(el, window.apiClient);
   }
 
   async function loadAdminSystemTasks() {
-    const tbody = document.getElementById("adminSystemTasksTableBody");
-    if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải tác vụ...</td></tr>`;
-    try {
-      const tasks = await window.apiClient.getAdminAllTasks();
-      if (!tasks || tasks.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 16px;">Chưa có tác vụ nào trong hệ thống.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = tasks.map(t => {
-        const timeStr = t.createdAt ? new Date(t.createdAt).toLocaleString('vi-VN') : '-';
-        return `
-          <tr>
-            <td style="font-family: var(--font-mono); font-weight: 600;">#${t.id}</td>
-            <td><strong>${t.ownerUsername || 'User'}</strong></td>
-            <td>${t.projectName || 'Dự án'}</td>
-            <td><span class="task-type-pill" style="font-size: 10px;">${t.type || 'TASK'}</span></td>
-            <td><span class="severity-tag ${t.status === 'COMPLETED' ? 'LOW' : 'HIGH'}">${t.status}</span></td>
-            <td style="font-size: 11px; color: var(--text-muted);">${timeStr}</td>
-            <td style="font-size: 11.5px; color: ${t.errorMessage ? 'var(--diff-del)' : 'var(--text-secondary)'};">
-              ${t.errorMessage ? t.errorMessage : 'Hoàn thành tốt'}
-            </td>
-          </tr>
-        `;
-      }).join("");
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi: ${err.message}</td></tr>`;
-    }
+    return window.AdminView.loadAdminSystemTasks(el, window.apiClient);
   }
 
   async function loadAdminAuditLogs() {
-    const tbody = document.getElementById("adminAuditTableBody");
-    if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Đang tải nhật ký kiểm toán...</td></tr>`;
-    try {
-      const logs = await window.apiClient.getAdminAuditLogs();
-      if (!logs || logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Chưa có nhật ký kiểm toán nào.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = logs.map(l => {
-        const timeStr = l.createdAt ? new Date(l.createdAt).toLocaleString('vi-VN') : '-';
-        return `
-          <tr>
-            <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${timeStr}</td>
-            <td><strong>${l.username || 'System'}</strong></td>
-            <td><span style="font-family: var(--font-mono); font-size: 11px; background: var(--bg-subtle); padding: 2px 6px; border-radius: 4px;">${l.action}</span></td>
-            <td style="font-size: 12px; color: var(--text-secondary);">${l.details || '-'}</td>
-            <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${l.ipAddress || '127.0.0.1'}</td>
-          </tr>
-        `;
-      }).join("");
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi: ${err.message}</td></tr>`;
+    return window.AdminView.loadAdminAuditLogs(window.apiClient);
+  }
+  // ==========================================================================
+  // AI CODING ASSISTANT CHATBOT PLATFORM CONTROLLER
+  // ==========================================================================
+
+  // Markdown Formatter (Delegated to MarkdownUtils module)
+  function formatMarkdown(content) {
+    return window.MarkdownUtils.formatMarkdown(content);
+  }
+  // Populate Chat Project Context Dropdown
+  function populateChatProjectDropdown() {
+    if (!el.selectChatProject) return;
+    const currentVal = el.selectChatProject.value;
+    let optionsHtml = `<option value="">Không gắn dự án (Hỏi đáp chung)</option>`;
+    if (state.projects && state.projects.length > 0) {
+      optionsHtml += state.projects.map(p => `
+        <option value="${p.id}" ${currentVal == p.id ? 'selected' : ''}>
+          ${p.name} (${p.language || 'Code'})
+        </option>
+      `).join("");
     }
+    el.selectChatProject.innerHTML = optionsHtml;
+    updateChatProjectHint();
   }
 
-  // ==========================================================================
-  // Interactive AI Chat Handlers
-  // ==========================================================================
-  let activeChatConversationId = null;
+  function updateChatProjectHint() {
+    if (!el.chatProjectHintText) return;
+    el.chatProjectHintText.textContent = "Enter để gửi • Shift+Enter xuống dòng";
+  }
 
-  async function loadChatConversations() {
-    const listEl = document.getElementById("chatConversationsList");
-    if (!listEl) return;
-    try {
-      const convs = await window.apiClient.getChatConversations();
-      if (!convs || convs.length === 0) {
-        listEl.innerHTML = `<div style="font-size: 11px; color: var(--text-muted); padding: 8px;">Chưa có hội thoại nào</div>`;
-        return;
-      }
-      listEl.innerHTML = convs.map(c => `
-        <div class="chat-conv-item ${c.id === activeChatConversationId ? 'active' : ''}" data-conv-id="${c.id}" title="${c.title}">
-          ${c.title || 'Hội thoại #' + c.id}
-        </div>
-      `).join("");
+  // Chat Conversations & Messaging (Delegated to ChatView module)
+  async function loadChatConversations(shouldAutoSelect = false) {
+    return window.ChatView.loadChatConversations(state, el, window.apiClient, shouldAutoSelect, renderSidebar);
+  }
 
-      listEl.querySelectorAll(".chat-conv-item").forEach(item => {
-        item.onclick = () => {
-          const id = Number(item.getAttribute("data-conv-id"));
-          selectChatConversation(id);
-        };
-      });
-
-      if (!activeChatConversationId && convs.length > 0) {
-        selectChatConversation(convs[0].id);
-      }
-    } catch (e) {
-      console.warn("Could not load chat conversations", e);
-    }
+  function renderSidebarConversations() {
+    renderSidebar();
   }
 
   async function selectChatConversation(id) {
-    activeChatConversationId = id;
-    const listEl = document.getElementById("chatConversationsList");
-    if (listEl) {
-      listEl.querySelectorAll(".chat-conv-item").forEach(item => {
-        item.classList.toggle("active", Number(item.getAttribute("data-conv-id")) === id);
-      });
-    }
-    const container = document.getElementById("chatMessagesContainer");
-    if (container) {
-      container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">Đang tải tin nhắn...</div>`;
-      try {
-        const detail = await window.apiClient.getChatConversationDetail(id);
-        if (detail && detail.messages && detail.messages.length > 0) {
-          container.innerHTML = detail.messages.map(m => `
-            <div class="chat-msg-row ${m.sender === 'USER' ? 'user' : 'agent'}">
-              <div class="chat-msg-bubble">${m.content}</div>
-              <div class="chat-msg-meta">${m.sender === 'USER' ? 'Bạn' : 'Soopi Agent'} • ${new Date(m.createdAt).toLocaleTimeString('vi-VN')}</div>
-            </div>
-          `).join("");
-          container.scrollTop = container.scrollHeight;
-        } else {
-          container.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 40px;">Bắt đầu trò chuyện với AI Agent!</div>`;
-        }
-      } catch (e) {
-        container.innerHTML = `<div style="color: var(--diff-del); text-align: center;">Lỗi tải tin nhắn: ${e.message}</div>`;
-      }
-    }
+    return window.ChatView.selectChatConversation(id, state, el, window.apiClient, renderSidebar);
   }
 
-  async function handleSendChatMessage() {
-    const input = document.getElementById("inputChatMessage");
-    if (!input) return;
-    const msg = input.value.trim();
-    if (!msg) return;
-
-    input.value = "";
-    const container = document.getElementById("chatMessagesContainer");
-    if (container) {
-      const userBubble = document.createElement("div");
-      userBubble.className = "chat-msg-row user";
-      userBubble.innerHTML = `
-        <div class="chat-msg-bubble">${msg}</div>
-        <div class="chat-msg-meta">Bạn • ${new Date().toLocaleTimeString('vi-VN')}</div>
-      `;
-      container.appendChild(userBubble);
-
-      const typingBubble = document.createElement("div");
-      typingBubble.className = "chat-msg-row agent";
-      typingBubble.id = "agentTypingBubble";
-      typingBubble.innerHTML = `
-        <div class="chat-msg-bubble" style="opacity: 0.7;">Soopi Agent đang suy nghĩ...</div>
-      `;
-      container.appendChild(typingBubble);
-      container.scrollTop = container.scrollHeight;
-
-      try {
-        const res = await window.apiClient.sendChatMessage(msg, activeChatConversationId);
-        typingBubble.remove();
-        if (res) {
-          activeChatConversationId = res.conversationId;
-          const agentBubble = document.createElement("div");
-          agentBubble.className = "chat-msg-row agent";
-          agentBubble.innerHTML = `
-            <div class="chat-msg-bubble">${res.content}</div>
-            <div class="chat-msg-meta">Soopi Agent • ${new Date(res.createdAt).toLocaleTimeString('vi-VN')}</div>
-          `;
-          container.appendChild(agentBubble);
-          container.scrollTop = container.scrollHeight;
-          loadChatConversations();
-        }
-      } catch (e) {
-        typingBubble.remove();
-        alert("Lỗi khi gửi tin nhắn: " + e.message);
-      }
-    }
+  function renderChatMessagesStream(messages) {
+    return window.ChatView.renderChatMessagesStream(messages, el);
   }
 
+  function startNewChatConversation() {
+    return window.ChatView.startNewChatConversation(state, el, renderSidebar);
+  }
+
+  async function deleteChatConversationById(convId) {
+    return window.ChatView.deleteChatConversationById(convId, state, el, window.apiClient, renderSidebar);
+  }
+
+  async function handleSendCentralChatMessage(customPrompt) {
+    return window.ChatView.handleSendCentralChatMessage(customPrompt, state, el, window.apiClient, renderSidebar);
+  }
   // Password visibility toggle helpers
   function setupPasswordToggle(btn, input) {
     if (!btn || !input) return;
@@ -899,25 +480,41 @@
     });
   }
 
-  // View Switcher: Unauthenticated Landing vs Welcome vs Workspace
+  // View Switcher: Unauthenticated Landing vs Chatbot vs Welcome vs Workspace
   function renderView() {
     if (!state.currentUser) {
       if (el.landingView) el.landingView.style.display = "flex";
+      if (el.chatAssistantView) el.chatAssistantView.style.display = "none";
       if (el.welcomeView) el.welcomeView.style.display = "none";
       if (el.workspaceView) el.workspaceView.style.display = "none";
+      if (el.navModePills) el.navModePills.style.display = "none";
+      if (el.sectionSidebarConversations) el.sectionSidebarConversations.style.display = "none";
       if (el.appSidebar) el.appSidebar.classList.add("collapsed");
     } else {
       if (el.landingView) el.landingView.style.display = "none";
       if (el.appSidebar) el.appSidebar.classList.remove("collapsed");
-      if (state.view === "workspace" && state.activeTask) {
+      if (el.navModePills) el.navModePills.style.display = "inline-flex";
+      if (el.sectionSidebarConversations) el.sectionSidebarConversations.style.display = "block";
+
+      if (el.btnModeChat) el.btnModeChat.classList.toggle("active", state.view === "chat");
+      if (el.btnModeReview) el.btnModeReview.classList.toggle("active", state.view !== "chat");
+
+      if (state.view === "chat") {
+        if (el.chatAssistantView) el.chatAssistantView.style.display = "flex";
+        if (el.welcomeView) el.welcomeView.style.display = "none";
+        if (el.workspaceView) el.workspaceView.style.display = "none";
+      } else if (state.view === "workspace" && state.activeTask) {
+        if (el.chatAssistantView) el.chatAssistantView.style.display = "none";
         if (el.welcomeView) el.welcomeView.style.display = "none";
         if (el.workspaceView) el.workspaceView.style.display = "flex";
       } else {
+        if (el.chatAssistantView) el.chatAssistantView.style.display = "none";
         if (el.welcomeView) el.welcomeView.style.display = "flex";
         if (el.workspaceView) el.workspaceView.style.display = "none";
       }
     }
   }
+  window.renderView = renderView;
 
   // Update User Profile Displays & Navbar Controls
   function updateUserDisplays() {
@@ -1005,6 +602,9 @@
       renderSidebar();
       renderWelcomeTasks();
       populateProjectSelect();
+      populateChatProjectDropdown();
+      await loadChatConversations(false);
+      await loadAvailableModels();
       startTaskPollingIfNeeded();
 
       if (state.currentUser && state.currentUser.role === 'ADMIN') {
@@ -1012,6 +612,22 @@
       }
     } catch (err) {
       console.error("Lỗi khi tải dữ liệu từ CSDL:", err);
+    }
+  }
+
+  // Load Available Models for Chat
+  async function loadAvailableModels() {
+    try {
+      const data = await window.apiClient.getSystemModels();
+      if (data && el.selectChatModel) {
+        const allowed = data.allowedModels || ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"];
+        const currentActive = (state.activeConversation && state.activeConversation.model) || el.selectChatModel.value || data.activeModel || "gemini-3.5-flash-lite";
+        el.selectChatModel.innerHTML = allowed.map(m => `
+          <option value="${m}" ${m === currentActive ? 'selected' : ''}>${m}${m === data.activeModel ? ' (Mặc định)' : ''}</option>
+        `).join("");
+      }
+    } catch (e) {
+      console.warn("Could not load system models:", e);
     }
   }
 
@@ -1052,7 +668,45 @@
     }
   }
 
-  // Render Recent Tasks on Welcome View
+  // Project & Workspace Management (Delegated to ProjectView module)
+  function renderWelcomeProjects() {
+    window.ProjectView.renderWelcomeProjects(state, el, openModal, selectProjectWorkspace);
+  }
+
+  function populateProjectSelect() {
+    window.ProjectView.populateProjectSelect(state, el);
+  }
+
+  async function handleDeleteProject(projId, projName) {
+    return window.ProjectView.handleDeleteProject(projId, projName, state, el, window.apiClient, {
+      startNewChatConversationFn: startNewChatConversation,
+      renderSidebarFn: renderSidebar,
+      renderWelcomeProjectsFn: renderWelcomeProjects
+    });
+  }
+
+  function renderSidebar() {
+    window.ProjectView.renderSidebar(state, el, {
+      selectProjectWorkspaceFn: selectProjectWorkspace,
+      startNewChatConversationFn: startNewChatConversation,
+      selectChatConversationFn: selectChatConversation,
+      deleteChatConversationFn: deleteChatConversationById,
+      handleDeleteProjectFn: handleDeleteProject,
+      openModalFn: openModal,
+      openLoginModalFn: openLoginModal
+    });
+  }
+
+  function selectProjectWorkspace(project) {
+    window.ProjectView.selectProjectWorkspace(project, state, el, {
+      selectChatConversationFn: selectChatConversation,
+      startNewChatConversationFn: startNewChatConversation,
+      renderSidebarFn: renderSidebar,
+      renderViewFn: renderView
+    });
+  }
+
+  // Render Tasks on Welcome View
   function renderWelcomeTasks() {
     const container = document.getElementById("recentTasksGrid");
     const countBadge = document.getElementById("welcomeTasksCount");
@@ -1079,18 +733,15 @@
         <div class="empty-tasks-card">
           <p style="font-weight: 600; margin-bottom: 4px;">Chưa có tác vụ AI nào thuộc tài khoản <strong>${state.currentUser.username}</strong> trong CSDL.</p>
           <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-            Nếu bạn đã tạo tác vụ từ Postman dưới tài khoản khác (ví dụ: <code>anh2</code>), hãy chuyển tài khoản để xem.
+            Mở dự án hoặc tạo phiên chat mới để bắt đầu làm việc cùng Antigravity AI Assistant.
           </p>
           <div style="display: flex; gap: 8px; justify-content: center;">
-            <button class="btn-primary-sm" id="btnWelcomeNewTask">+ Chạy AI Review Mới</button>
-            <button class="btn-secondary-sm" id="btnWelcomeSwitchUser">Chuyển tài khoản</button>
+            <button class="btn-primary-sm" id="btnWelcomeNewChat">+ Tạo phiên Chat mới</button>
           </div>
         </div>
       `;
-      const btnNew = document.getElementById("btnWelcomeNewTask");
-      if (btnNew) btnNew.addEventListener("click", () => { populateProjectSelect(); openModal(el.modalCreateTask); });
-      const btnSwitch = document.getElementById("btnWelcomeSwitchUser");
-      if (btnSwitch) btnSwitch.addEventListener("click", () => openAccountOrAuthModal());
+      const btnNew = document.getElementById("btnWelcomeNewChat");
+      if (btnNew) btnNew.addEventListener("click", () => startNewChatConversation());
       return;
     }
 
@@ -1114,15 +765,15 @@
           <div class="welcome-task-top">
             <div class="welcome-task-id-badge">
               <span class="task-hash">Task #${t.id}</span>
-              <span class="task-type-tag">${t.type}</span>
+              <span class="task-type-tag">${t.taskType || t.type || 'TASK'}</span>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
               <button class="btn-pin-task-welcome ${t.isPinned ? 'pinned' : ''}" data-pin-task="${t.id}" title="${t.isPinned ? 'Bỏ ghim tác vụ' : 'Ghim tác vụ lên thanh bên'}">
                 ${t.isPinned ? 'Bỏ ghim' : 'Ghim'}
               </button>
-              <span class="status-indicator-pill ${t.status}">
+              <span class="status-indicator-pill ${t.status ? t.status.toLowerCase() : 'completed'}">
                 ${isProcessing ? '<span class="spin-dot"></span>' : ''}
-                ${t.status}
+                ${t.status || 'COMPLETED'}
               </span>
             </div>
           </div>
@@ -1175,505 +826,150 @@
 
   // Check Backend and MySQL Status
   async function checkConnection() {
-    el.dbStatusText.textContent = "Kiểm tra CSDL...";
-    const isOnline = await window.apiClient.checkHealth();
-    if (isOnline) {
-      el.dbStatusPill.className = "db-status-pill";
-      el.dbIndicator.style.background = "var(--diff-add)";
-      el.dbStatusText.textContent = "CSDL MySQL: Đã kết nối";
-    } else {
-      el.dbStatusPill.className = "db-status-pill demo";
-      el.dbIndicator.style.background = "#f59e0b";
-      el.dbStatusText.textContent = "Chưa kết nối máy chủ";
+    if (el.dbStatusText) el.dbStatusText.textContent = "Kiểm tra CSDL...";
+    try {
+      const isOnline = await window.apiClient.checkHealth();
+      if (isOnline) {
+        if (el.dbStatusPill) el.dbStatusPill.className = "db-status-pill";
+        if (el.dbIndicator) el.dbIndicator.style.background = "var(--diff-add)";
+        if (el.dbStatusText) el.dbStatusText.textContent = "CSDL MySQL: Đã kết nối";
+      } else {
+        if (el.dbStatusPill) el.dbStatusPill.className = "db-status-pill demo";
+        if (el.dbIndicator) el.dbIndicator.style.background = "#f59e0b";
+        if (el.dbStatusText) el.dbStatusText.textContent = "Chưa kết nối máy chủ";
+      }
+    } catch (_) {
+      if (el.dbStatusPill) el.dbStatusPill.className = "db-status-pill demo";
+      if (el.dbIndicator) el.dbIndicator.style.background = "#f59e0b";
+      if (el.dbStatusText) el.dbStatusText.textContent = "Chưa kết nối máy chủ";
     }
   }
 
-  // Populate project select in modals
-  function populateProjectSelect() {
-    if (!el.selectTaskProject) return;
-    if (state.projects.length === 0) {
-      el.selectTaskProject.innerHTML = `<option value="">Chưa có dự án nào trong CSDL - hãy mở dự án trước</option>`;
-      return;
+  // Helper: Perform quick demo login
+  async function performQuickLogin(username = "admin", password = "admin") {
+    try {
+      const res = await window.apiClient.login(username, password);
+      if (res && res.token) {
+        state.currentUser = res.user || { username, role: "ADMIN" };
+        closeModals();
+        updateUserDisplays();
+        await loadDatabaseData();
+      }
+    } catch (e) {
+      alert("Đăng nhập thất bại: " + (e.message || "Vui lòng kiểm tra lại kết nối đến máy chủ"));
     }
-    el.selectTaskProject.innerHTML = state.projects.map(p => `
-      <option value="${p.id}">${p.name} (${p.language || 'Java'})</option>
-    `).join("");
   }
 
-  // Render Sidebar (PINNED & PROJECTS from DB)
-  function renderSidebar() {
-    // 1. PINNED TASKS (Chỉ hiện khi có task được ghim)
-    const hasPinned = state.pinnedTasks && state.pinnedTasks.length > 0;
-    if (el.sectionPinnedTasks) {
-      el.sectionPinnedTasks.style.display = hasPinned ? "block" : "none";
-    }
-    if (el.pinnedCountBadge) {
-      el.pinnedCountBadge.textContent = state.pinnedTasks.length;
-    }
-
-    if (hasPinned) {
-      el.pinnedTasksContainer.innerHTML = state.pinnedTasks.map(t => {
-        const timeAgo = formatRelativeTime(t.createdAt);
-        const isActive = state.activeTask && state.activeTask.id === t.id;
-        const statusClass = t.status || "COMPLETED";
-        const isPinned = t.isPinned === true;
-
-        return `
-          <div class="task-item-card ${isActive ? 'active' : ''}" data-task-id="${t.id}" title="Tạo lúc: ${new Date(t.createdAt || Date.now()).toLocaleString('vi-VN')}">
-            <div class="task-left">
-              <span class="task-type-pill">${t.type || 'REVIEW'}</span>
-              <span class="task-title-text">${t.projectName || ('Task #' + t.id)}</span>
-            </div>
-            <div class="task-right">
-              <span class="task-status-dot ${statusClass}" title="Trạng thái: ${statusClass}"></span>
-              <span class="task-time-text">${timeAgo}</span>
-              <button class="pin-toggle-btn ${isPinned ? 'pinned' : ''}" data-pin-task="${t.id}" title="${isPinned ? 'Bỏ ghim' : 'Ghim lên đầu'}">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="17" x2="12" y2="22"></line>
-                  <path d="M5 17h14v-2l-2-2V5a1 1 0 0 0-1-1h-8a1 1 0 0 0-1 1v8l-2 2v2z"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
-        `;
-      }).join("");
-    } else {
-      el.pinnedTasksContainer.innerHTML = "";
-    }
-
-    // 2. PROJECTS
-    if (state.projects.length === 0) {
-      el.projectsTreeContainer.innerHTML = `
-        <div style="padding: 12px; font-size: 12px; color: var(--text-muted); text-align: center; border: 1px dashed var(--border-main); border-radius: 6px;">
-          ${state.currentUser ? 'Chưa có dự án nào trong CSDL.<br><button id="btnEmptyAddProject" style="margin-top: 6px; padding: 4px 10px; font-size: 11.5px; cursor: pointer; border-radius: 4px; background: var(--bg-subtle); border: 1px solid var(--border-main);">+ Thêm dự án đầu tiên</button>' : '<button id="btnEmptyLogin" style="margin-top: 6px; padding: 4px 10px; font-size: 11.5px; cursor: pointer; border-radius: 4px; background: var(--accent-primary); color: #fff; border: none;">Đăng nhập để xem dự án</button>'}
-        </div>
-      `;
-      const btnEmpty = document.getElementById("btnEmptyAddProject");
-      if (btnEmpty) btnEmpty.addEventListener("click", () => openModal(el.modalOpenProject));
-      const btnEmptyLogin = document.getElementById("btnEmptyLogin");
-      if (btnEmptyLogin) btnEmptyLogin.addEventListener("click", () => openLoginModal(false));
-    } else {
-      el.projectsTreeContainer.innerHTML = state.projects.map(proj => {
-        const projTasks = state.tasks.filter(t => t.projectId === proj.id);
-        const tasksHtml = projTasks.length > 0 ? projTasks.map(t => {
-          const timeAgo = formatRelativeTime(t.createdAt);
-          const statusClass = t.status || "COMPLETED";
-          return `
-            <li class="task-item-card" data-task-id="${t.id}" style="padding: 5px 8px; font-size: 12px;" title="${t.type} • Tạo lúc ${new Date(t.createdAt).toLocaleString('vi-VN')}">
-              <div class="task-left">
-                <span class="task-type-pill" style="font-size: 9px;">${t.type}</span>
-                <span class="task-title-text">#${t.id}</span>
-              </div>
-              <div class="task-right">
-                <span class="task-status-dot ${statusClass}"></span>
-                <span class="task-time-text">${timeAgo}</span>
-              </div>
-            </li>
-          `;
-        }).join("") : `
-          <div style="padding: 4px 8px; font-size: 11px; color: var(--text-muted);">Chưa có review nào</div>
-        `;
-
-        return `
-          <div class="project-group-box">
-            <div class="project-folder-row" data-proj-id="${proj.id}">
-              <div class="project-folder-left">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                </svg>
-                <span class="project-folder-name">${proj.name}</span>
-              </div>
-              <span class="project-lang-pill">${proj.language || 'Java'}</span>
-            </div>
-            <ul class="project-subtasks-list">
-              ${tasksHtml}
-            </ul>
-          </div>
-        `;
-      }).join("");
-    }
-
-    attachSidebarClickEvents();
-  }
-
-  function attachSidebarClickEvents() {
-    // Task click in sidebar
-    document.querySelectorAll("[data-task-id]").forEach(item => {
-      item.addEventListener("click", (e) => {
-        if (e.target.closest("[data-pin-task]")) return;
-        const taskId = Number(item.getAttribute("data-task-id"));
-        const task = state.tasks.find(t => t.id === taskId);
-        if (task) {
-          const project = state.projects.find(p => p.id === task.projectId) || { name: task.projectName || "Dự án", path: "Local", language: "Java" };
-          selectTask(task, project);
-        }
-      });
-    });
-
-    // Toggle Pin button
-    document.querySelectorAll("[data-pin-task]").forEach(btn => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const taskId = Number(btn.getAttribute("data-pin-task"));
-        const updated = await window.apiClient.togglePin(taskId);
-        if (updated) {
-          const idx = state.tasks.findIndex(t => t.id === taskId);
-          if (idx >= 0) state.tasks[idx].isPinned = updated.isPinned;
-          state.pinnedTasks = state.tasks.filter(t => t.isPinned === true);
-          renderSidebar();
-          renderWelcomeTasks();
-          if (state.activeTask && state.activeTask.id === taskId) {
-            state.activeTask.isPinned = updated.isPinned;
-            if (el.pinActiveTaskIcon) el.pinActiveTaskIcon.textContent = "";
-            if (el.pinActiveTaskLabel) el.pinActiveTaskLabel.textContent = updated.isPinned ? "Đã ghim" : "Ghim tác vụ";
-          }
-        }
-      });
-    });
-
-    // Project folder click
-    document.querySelectorAll(".project-folder-row").forEach(row => {
-      row.addEventListener("click", () => {
-        const projId = Number(row.getAttribute("data-proj-id"));
-        const project = state.projects.find(p => p.id === projId);
-        if (project) {
-          const projectTasks = state.tasks.filter(t => t.projectId === projId);
-          const latestTask = projectTasks.length > 0 ? projectTasks[0] : null;
-          selectTask(latestTask, project);
-        }
-      });
-    });
-  }
-
-  // Switch to Workspace & Show Task/Project Details
+  // Backward compatibility alias for selectTask
   function selectTask(task, project) {
-    state.activeTask = task;
-    state.activeProject = project;
-    state.view = "workspace";
-
-    el.welcomeView.style.display = "none";
-    el.workspaceView.style.display = "flex";
-
-    // Tự động kích hoạt tab "Kết quả đánh giá" để hiển thị thông tin ngay lập tức khi click vào task
-    state.activeTab = "findings";
-    if (el.viewTabs) {
-      el.viewTabs.forEach(btn => {
-        if (btn.getAttribute("data-tab") === "findings") {
-          btn.classList.add("active");
-        } else {
-          btn.classList.remove("active");
-        }
-      });
-    }
-    const tabFindingsBody = document.getElementById("tabFindingsBody");
-    const tabToolTraceBody = document.getElementById("tabToolTraceBody");
-    const tabTasksHistoryBody = document.getElementById("tabTasksHistoryBody");
-    if (tabFindingsBody) tabFindingsBody.style.display = "block";
-    if (tabToolTraceBody) tabToolTraceBody.style.display = "none";
-    if (tabTasksHistoryBody) tabTasksHistoryBody.style.display = "none";
-
-    el.navActiveProjectText.textContent = project ? project.name : "Dự án";
-    el.viewProjectTitle.textContent = `${project ? project.name : 'Dự án'} ${task ? '• Task #' + task.id : ''}`;
-    el.viewProjectPath.textContent = project ? (project.path || "D:/AI Agent/aiagent/aiagent") : "Local";
-    el.viewProjectLang.textContent = project ? (project.language || "Java") : "Java";
-
-    const status = task ? (task.status || "COMPLETED") : "CHƯA CÓ TÁC VỤ";
-    el.viewTaskStatusPill.textContent = status;
-    el.viewTaskStatusPill.className = `status-indicator-pill ${status}`;
-    el.viewTaskTimestamp.textContent = task ? `Tạo lúc ${formatRelativeTime(task.createdAt)}` : "";
-
-    // Update Workspace Pin Button
-    if (el.btnPinActiveTask) {
-      if (task) {
-        el.btnPinActiveTask.style.display = "inline-flex";
-        const isPinned = task.isPinned === true;
-        if (el.pinActiveTaskIcon) el.pinActiveTaskIcon.textContent = "";
-        if (el.pinActiveTaskLabel) el.pinActiveTaskLabel.textContent = isPinned ? "Đã ghim" : "Ghim";
-      } else {
-        el.btnPinActiveTask.style.display = "none";
-      }
-    }
-
-    // Update Task Action Controls (Cancel, Retry, Delete)
-    const btnCancelTask = document.getElementById("btnCancelTask");
-    const btnRetryTask = document.getElementById("btnRetryTask");
-    const btnDeleteTask = document.getElementById("btnDeleteTask");
-
-    if (task) {
-      if (btnCancelTask) {
-        btnCancelTask.style.display = (task.status === "PENDING" || task.status === "IN_PROGRESS" || task.status === "PROCESSING") ? "inline-flex" : "none";
-        btnCancelTask.onclick = async () => {
-          if (!confirm(`Bạn có chắc chắn muốn hủy tác vụ #${task.id} không?`)) return;
-          try {
-            await window.apiClient.cancelTask(task.id);
-            await loadDatabaseData();
-            alert(`Đã gửi yêu cầu hủy tác vụ #${task.id}`);
-          } catch (e) {
-            alert(`Lỗi khi hủy: ${e.message}`);
-          }
-        };
-      }
-      if (btnRetryTask) {
-        btnRetryTask.style.display = "inline-flex";
-        btnRetryTask.onclick = async () => {
-          try {
-            const retried = await window.apiClient.retryTask(task.id);
-            await loadDatabaseData();
-            selectTask(retried, project);
-            alert(`Đã khởi chạy lại tác vụ #${task.id}`);
-          } catch (e) {
-            alert(`Lỗi khi chạy lại: ${e.message}`);
-          }
-        };
-      }
-      if (btnDeleteTask) {
-        btnDeleteTask.style.display = "inline-flex";
-        btnDeleteTask.onclick = async () => {
-          if (!confirm(`Bạn có chắc muốn xóa vĩnh viễn tác vụ #${task.id} không?`)) return;
-          try {
-            await window.apiClient.deleteTask(task.id);
-            state.activeTask = null;
-            await loadDatabaseData();
-            alert(`Đã xóa tác vụ #${task.id}`);
-          } catch (e) {
-            alert(`Lỗi khi xóa: ${e.message}`);
-          }
-        };
-      }
+    const proj = project || (task && task.projectId ? state.projects.find(p => p.id === task.projectId) : null) || state.activeProject;
+    if (proj) {
+      selectProjectWorkspace(proj);
     } else {
-      [btnCancelTask, btnRetryTask, btnDeleteTask].forEach(b => {
-        if (b) b.style.display = "none";
-      });
+      startNewChatConversation();
     }
-
-    // Parse Output & Findings from DB
-    let findings = [];
-    let summary = "";
-    let suggestions = [];
-
-    const aiSummaryCard = document.getElementById("aiSummaryCard");
-    const aiSummaryText = document.getElementById("aiSummaryText");
-    const aiSuggestionsBox = document.getElementById("aiSuggestionsBox");
-    const aiSuggestionsList = document.getElementById("aiSuggestionsList");
-
-    if (task && task.output) {
-      let rawJsonStr = typeof task.output === "string" ? task.output : JSON.stringify(task.output, null, 2);
-      try {
-        const parsed = typeof task.output === "string" ? JSON.parse(task.output) : task.output;
-        summary = parsed.summary || "";
-        if (typeof summary === "object") summary = JSON.stringify(summary);
-
-        // Support BOTH 'issues' (Spring AI CodeReviewAgent) and 'findings' (Mock/other agents)
-        const rawList = parsed.issues || parsed.findings || [];
-        if (Array.isArray(rawList)) {
-          findings = rawList.map(item => ({
-            severity: (item.severity || "LOW").toUpperCase(),
-            category: item.category || "CODE_QUALITY",
-            file: item.file || "Dự án",
-            line: item.line || null,
-            title: item.title || (item.category ? `[${item.category}] ` : "") + (item.description ? (item.description.length > 70 ? item.description.substring(0, 70) + "..." : item.description) : "Phát hiện mã nguồn"),
-            description: item.description || item.message || "",
-            suggestion: item.recommendation || item.suggestion || ""
-          }));
-        }
-
-        if (Array.isArray(parsed.suggestions)) {
-          suggestions = parsed.suggestions;
-        }
-      } catch (e) {
-        console.warn("Could not parse output as JSON, showing raw output", e);
-        summary = rawJsonStr;
-      }
-    } else if (task && task.errorMessage) {
-      summary = `Tác vụ gặp lỗi khi thực thi: ${task.errorMessage}`;
-    }
-
-    // Render AI Summary Card
-    if (aiSummaryCard) {
-      if (summary) {
-        aiSummaryCard.style.display = "block";
-        if (aiSummaryText) aiSummaryText.textContent = summary || "Đã nhận kết quả đánh giá từ AI Agent.";
-        
-        if (aiSuggestionsBox && aiSuggestionsList) {
-          if (suggestions.length > 0) {
-            aiSuggestionsBox.style.display = "block";
-            aiSuggestionsList.innerHTML = suggestions.map(s => `<li>${s}</li>`).join("");
-          } else {
-            aiSuggestionsBox.style.display = "none";
-          }
-        }
-      } else {
-        aiSummaryCard.style.display = "none";
-      }
-    }
-
-    // Render Metrics
-    const criticalCount = findings.filter(f => f.severity === "CRITICAL").length;
-    const highCount = findings.filter(f => f.severity === "HIGH").length;
-    const medCount = findings.filter(f => f.severity === "MEDIUM").length;
-    const lowCount = findings.filter(f => f.severity === "LOW" || f.severity === "CODE_QUALITY").length;
-
-    el.metricCritical.textContent = criticalCount;
-    el.metricHigh.textContent = highCount;
-    el.metricMedium.textContent = medCount;
-    el.metricLow.textContent = lowCount;
-    el.totalFindingsNum.textContent = findings.length;
-
-    // Render Findings List
-    if (findings.length === 0) {
-      if (task && (task.status === "PROCESSING" || task.status === "PENDING")) {
-        el.findingsListWrapper.innerHTML = `
-          <div style="padding: 32px 20px; text-align: center; color: var(--primary-accent); border: 1px dashed var(--border-main); border-radius: 8px; background: var(--bg-subtle);">
-            <div style="font-size: 20px; margin-bottom: 8px;"> ⏳</div>
-            <div style="font-weight: 600; font-size: 14px;">AI Agent đang phân tích mã nguồn...</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Hệ thống đang tự động theo dõi tiến độ và sẽ cập nhật kết quả ngay khi hoàn thành.</div>
-          </div>
-        `;
-      } else {
-        el.findingsListWrapper.innerHTML = `
-          <div style="padding: 24px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-main); border-radius: 8px;">
-            ${summary ? 'AI Agent không phát hiện vấn đề bất thường nào cần cảnh báo.' : 'Tác vụ này chưa có kết quả đánh giá trong CSDL.'}
-          </div>
-        `;
-      }
-    } else {
-      el.findingsListWrapper.innerHTML = findings.map(f => `
-        <div class="finding-card-item">
-          <div class="finding-header-row">
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <span class="severity-tag ${f.severity}">${f.severity}</span>
-              <span class="severity-tag ${f.category}">${f.category}</span>
-            </div>
-            <span class="finding-file-loc">${f.file}${f.line ? ':' + f.line : ''}</span>
-          </div>
-          <div class="finding-issue-title">${f.title}</div>
-          <div class="finding-issue-desc">${f.description}</div>
-          ${f.suggestion ? `<div class="finding-code-diff">Đề xuất sửa đổi từ AI Agent:\n${f.suggestion}</div>` : ''}
-        </div>
-      `).join("");
-    }
-
-    // Render Tool Traces
-    el.toolTracesContainer.innerHTML = `
-      <div class="tool-step-row">
-        <div class="tool-step-num">1</div>
-        <div class="tool-step-info">
-          <div class="tool-step-header">
-            <span>ListDirectoryTool</span>
-            <span style="font-size: 11px; color: var(--text-muted);">120ms</span>
-          </div>
-          <div class="tool-step-content">Đọc cấu trúc cây thư mục tại: ${project.path || 'workspace'}\nKết quả: Khám phá các thư mục và source files.</div>
-        </div>
-      </div>
-      <div class="tool-step-row">
-        <div class="tool-step-num">2</div>
-        <div class="tool-step-info">
-          <div class="tool-step-header">
-            <span>GrepTool</span>
-            <span style="font-size: 11px; color: var(--text-muted);">85ms</span>
-          </div>
-          <div class="tool-step-content">Truy vấn mẫu bảo mật: "permitAll|SecurityConfig|jwt|password"\nKết quả: Tìm thấy các điểm nhạy cảm cần rà soát sâu.</div>
-        </div>
-      </div>
-      <div class="tool-step-row">
-        <div class="tool-step-num">3</div>
-        <div class="tool-step-info">
-          <div class="tool-step-header">
-            <span>ReadFileTool</span>
-            <span style="font-size: 11px; color: var(--text-muted);">64ms</span>
-          </div>
-          <div class="tool-step-content">Đọc nội dung chi tiết: SecurityConfig.java & Controller files.</div>
-        </div>
-      </div>
-      <div class="tool-step-row">
-        <div class="tool-step-num">4</div>
-        <div class="tool-step-info">
-          <div class="tool-step-header">
-            <span>AI Reasoning</span>
-            <span style="font-size: 11px; color: var(--text-muted);">1420ms</span>
-          </div>
-          <div class="tool-step-content">Lập luận tổng hợp: Hoàn tất phân tích mã nguồn và đề xuất bản vá.</div>
-        </div>
-      </div>
-    `;
-
-    // Render Project Tasks History in Tab 3
-    const projectTasks = state.tasks.filter(t => t.projectId === project.id);
-    el.totalTasksNum.textContent = projectTasks.length;
-    el.tasksHistoryWrapper.innerHTML = projectTasks.map(t => `
-      <div class="finding-card-item" style="cursor: pointer;" data-history-task-id="${t.id}">
-        <div class="finding-header-row">
-          <span class="severity-tag ${t.status === 'COMPLETED' ? 'LOW' : 'HIGH'}">${t.status}</span>
-          <span class="finding-file-loc">Task #${t.id} • ${t.type}</span>
-        </div>
-        <div class="finding-issue-title" style="margin-top: 4px;">Tác vụ AI Review cho ${project.name}</div>
-        <div class="workspace-meta-line" style="font-size: 11.5px; margin-top: 6px;">
-          <span>Thời gian tạo CSDL: ${new Date(t.createdAt).toLocaleString('vi-VN')}</span>
-          <span>•</span>
-          <span>${formatRelativeTime(t.createdAt)}</span>
-        </div>
-      </div>
-    `).join("");
-
-    // Gắn sự kiện click vào từng task trong tab Lịch sử tác vụ
-    el.tasksHistoryWrapper.querySelectorAll("[data-history-task-id]").forEach(item => {
-      item.addEventListener("click", () => {
-        const tId = Number(item.getAttribute("data-history-task-id"));
-        const found = state.tasks.find(t => t.id === tId);
-        if (found) {
-          selectTask(found, project);
-        }
-      });
-    });
-
-    renderSidebar();
   }
 
   // Event Listeners Setup
   function initEventListeners() {
-    // Theme toggle
-    el.btnThemeToggle.addEventListener("click", () => {
-      applyTheme(state.theme === "dark" ? "light" : "dark");
-    });
-
-    // Sidebar toggle
-    el.btnToggleSidebar.addEventListener("click", () => {
-      el.appSidebar.classList.toggle("collapsed");
-    });
-
-    // Brand link / Back to Home
-    el.brandLink.addEventListener("click", () => {
-      if (!state.currentUser) {
-        state.view = "landing";
-        renderView();
-        return;
-      }
-      state.view = "welcome";
-      renderView();
-      el.navActiveProjectText.textContent = "soopi";
-      document.querySelectorAll(".task-item-card").forEach(i => i.classList.remove("active"));
-    });
-
-    el.btnBackToHome.addEventListener("click", () => {
-      el.brandLink.click();
-    });
-
-    // Tab buttons in workspace
-    el.viewTabs.forEach(btn => {
+    // Antigravity Quick Commands (/review, /fix, /explain, /test)
+    document.querySelectorAll("[data-cmd]").forEach(btn => {
       btn.addEventListener("click", () => {
-        el.viewTabs.forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        const tab = btn.getAttribute("data-tab");
-        document.getElementById("tabFindingsBody").style.display = tab === "findings" ? "block" : "none";
-        document.getElementById("tabToolTraceBody").style.display = tab === "tooltrace" ? "block" : "none";
-        document.getElementById("tabTasksHistoryBody").style.display = tab === "tasks" ? "block" : "none";
-        const tabChat = document.getElementById("tabChatBody");
-        if (tabChat) {
-          tabChat.style.display = tab === "chat" ? "block" : "none";
-          if (tab === "chat") loadChatConversations();
+        const cmd = btn.getAttribute("data-cmd");
+        if (!el.centralChatTextarea) return;
+        let text = cmd + " ";
+        if (cmd === "/review") {
+          text = "/review Hãy rà soát toàn diện mã nguồn dự án, phát hiện các lỗi logic, lỗ hổng bảo mật và đề xuất cải tiến.";
+        } else if (cmd === "/fix") {
+          text = "/fix Hãy chẩn đoán nguyên nhân lỗi và cung cấp bản vá hoàn chỉnh cho file: ";
+        } else if (cmd === "/explain") {
+          text = "/explain Hãy giải thích chi tiết cấu trúc, luồng thực thi và thuật toán của file: ";
+        } else if (cmd === "/test") {
+          text = "/test Hãy phân tích và tự động sinh bộ unit tests đầy đủ cho: ";
         }
+        el.centralChatTextarea.value = text;
+        el.centralChatTextarea.focus();
+        const len = el.centralChatTextarea.value.length;
+        el.centralChatTextarea.setSelectionRange(len, len);
       });
     });
+
+    // Antigravity Workspace Switcher & Back Buttons
+    if (el.btnSwitchWorkspace) {
+      el.btnSwitchWorkspace.addEventListener("click", () => {
+        state.view = "welcome";
+        renderView();
+      });
+    }
+    if (el.btnChatBackHome) {
+      el.btnChatBackHome.addEventListener("click", () => {
+        state.view = "welcome";
+        renderView();
+      });
+    }
+    if (el.btnSelectWorkspace) {
+      el.btnSelectWorkspace.addEventListener("click", () => {
+        state.view = "welcome";
+        renderView();
+      });
+    }
+
+    // Theme toggle
+    if (el.btnThemeToggle) {
+      el.btnThemeToggle.addEventListener("click", () => {
+        applyTheme(state.theme === "dark" ? "light" : "dark");
+      });
+    }
+
+    // Sidebar toggle
+    if (el.btnToggleSidebar) {
+      el.btnToggleSidebar.addEventListener("click", () => {
+        if (el.appSidebar) el.appSidebar.classList.toggle("collapsed");
+      });
+    }
+
+    // Brand link / Back to Home
+    if (el.brandLink) {
+      el.brandLink.addEventListener("click", () => {
+        if (!state.currentUser) {
+          state.view = "landing";
+          renderView();
+          return;
+        }
+        state.view = "welcome";
+        renderView();
+        if (el.navActiveProjectText) el.navActiveProjectText.textContent = "soopi";
+        document.querySelectorAll(".task-item-card").forEach(i => i.classList.remove("active"));
+      });
+    }
+
+    if (el.btnBackToHome) {
+      el.btnBackToHome.addEventListener("click", () => {
+        if (el.brandLink) el.brandLink.click();
+      });
+    }
+
+    // Tab buttons in workspace (if present)
+    if (el.viewTabs) {
+      el.viewTabs.forEach(btn => {
+        btn.addEventListener("click", () => {
+          el.viewTabs.forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          const tab = btn.getAttribute("data-tab");
+          const fb = document.getElementById("tabFindingsBody");
+          if (fb) fb.style.display = tab === "findings" ? "block" : "none";
+          const tb = document.getElementById("tabToolTraceBody");
+          if (tb) tb.style.display = tab === "tooltrace" ? "block" : "none";
+          const hb = document.getElementById("tabTasksHistoryBody");
+          if (hb) hb.style.display = tab === "tasks" ? "block" : "none";
+          const tabChat = document.getElementById("tabChatBody");
+          if (tabChat) {
+            tabChat.style.display = tab === "chat" ? "block" : "none";
+            if (tab === "chat") loadChatConversations();
+          }
+        });
+      });
+    }
 
     setupPasswordToggle(el.btnToggleLoginPassword, document.getElementById("loginPassword"));
     setupPasswordToggle(el.btnToggleRegPassword, document.getElementById("regPassword"));
@@ -1873,25 +1169,127 @@
       });
     }
 
-    // Chat Controls (New Conv, Send button, Enter key)
-    const btnNewChat = document.getElementById("btnNewChatConversation");
-    if (btnNewChat) {
-      btnNewChat.addEventListener("click", () => {
-        activeChatConversationId = null;
-        const container = document.getElementById("chatMessagesContainer");
-        if (container) {
-          container.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 40px;">Bắt đầu phiên hội thoại mới với AI Agent!</div>`;
-        }
-        const listEl = document.getElementById("chatConversationsList");
-        if (listEl) {
-          listEl.querySelectorAll(".chat-conv-item").forEach(i => i.classList.remove("active"));
+    // Mode Switcher Pills (Chatbot vs Code Review)
+    if (el.btnModeChat) {
+      el.btnModeChat.addEventListener("click", () => {
+        state.view = "chat";
+        renderView();
+      });
+    }
+
+    if (el.btnModeReview) {
+      el.btnModeReview.addEventListener("click", () => {
+        state.view = "welcome";
+        renderView();
+      });
+    }
+
+    // Sidebar & Header New Chat buttons
+    if (el.btnSidebarNewChat) {
+      el.btnSidebarNewChat.addEventListener("click", startNewChatConversation);
+    }
+
+    if (el.btnHeaderNewChat) {
+      el.btnHeaderNewChat.addEventListener("click", startNewChatConversation);
+    }
+
+    // Header Delete Conversation button
+    if (el.btnDeleteActiveChat) {
+      el.btnDeleteActiveChat.addEventListener("click", () => {
+        if (state.activeConversationId) {
+          deleteChatConversationById(state.activeConversationId);
+        } else {
+          const hasMessages = el.chatMessagesList && el.chatMessagesList.children.length > 0;
+          if (hasMessages) {
+            if (confirm("Bạn có muốn làm mới và xóa tin nhắn trong phiên hội thoại hiện tại không?")) {
+              startNewChatConversation();
+            }
+          } else {
+            startNewChatConversation();
+          }
         }
       });
     }
 
+    // Header Delete Project button
+    if (el.btnDeleteActiveProject) {
+      el.btnDeleteActiveProject.addEventListener("click", () => {
+        if (state.activeProject) {
+          handleDeleteProject(state.activeProject.id, state.activeProject.name);
+        } else {
+          alert("Chưa chọn dự án nào để xóa.");
+        }
+      });
+    }
+
+    // Chat Model Selector change
+    if (el.selectChatModel) {
+      el.selectChatModel.addEventListener("change", async () => {
+        const newModel = el.selectChatModel.value;
+        if (state.activeConversationId) {
+          try {
+            await window.apiClient.updateChatConversationModel(state.activeConversationId, newModel);
+            if (state.activeConversation) state.activeConversation.model = newModel;
+            const convInList = state.conversations.find(c => c.id === state.activeConversationId);
+            if (convInList) convInList.model = newModel;
+          } catch (e) {
+            console.warn("Lỗi cập nhật mô hình cho hội thoại:", e);
+          }
+        }
+      });
+    }
+
+    // Central Chat Send Button & Enter Key
+    if (el.btnSendCentralChat) {
+      el.btnSendCentralChat.addEventListener("click", () => handleSendCentralChatMessage());
+    }
+
+    if (el.centralChatTextarea) {
+      el.centralChatTextarea.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          handleSendCentralChatMessage();
+        }
+      });
+      el.centralChatTextarea.addEventListener("input", () => {
+        el.centralChatTextarea.style.height = "auto";
+        el.centralChatTextarea.style.height = Math.min(el.centralChatTextarea.scrollHeight, 120) + "px";
+      });
+    }
+
+    // Chat Project Context Selector
+    if (el.selectChatProject) {
+      el.selectChatProject.addEventListener("change", () => {
+        updateChatProjectHint();
+      });
+    }
+
+    // Suggestion Chips
+    document.querySelectorAll(".suggestion-chip[data-prompt]").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const prompt = chip.getAttribute("data-prompt");
+        if (prompt) {
+          handleSendCentralChatMessage(prompt);
+        }
+      });
+    });
+
+    // Legacy Workspace Chat Tab Controls
+    const btnNewChat = document.getElementById("btnNewChatConversation");
+    if (btnNewChat) {
+      btnNewChat.addEventListener("click", startNewChatConversation);
+    }
+
     const btnSendChat = document.getElementById("btnSendChatMessage");
     if (btnSendChat) {
-      btnSendChat.addEventListener("click", handleSendChatMessage);
+      btnSendChat.addEventListener("click", () => {
+        const inputChat = document.getElementById("inputChatMessage");
+        if (inputChat && inputChat.value.trim()) {
+          const val = inputChat.value.trim();
+          inputChat.value = "";
+          handleSendCentralChatMessage(val);
+        }
+      });
     }
 
     const inputChat = document.getElementById("inputChatMessage");
@@ -1899,7 +1297,11 @@
       inputChat.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          handleSendChatMessage();
+          if (inputChat.value.trim()) {
+            const val = inputChat.value.trim();
+            inputChat.value = "";
+            handleSendCentralChatMessage(val);
+          }
         }
       });
     }
@@ -1975,6 +1377,16 @@
       el.btnLandingRegister.addEventListener("click", () => openLoginModal(true));
     }
 
+    const btnLandingQuick = document.getElementById("btnLandingQuickLogin");
+    if (btnLandingQuick) {
+      btnLandingQuick.addEventListener("click", () => performQuickLogin("admin", "admin"));
+    }
+
+    const btnQuickAdmin = document.getElementById("btnQuickLoginAdmin");
+    if (btnQuickAdmin) {
+      btnQuickAdmin.addEventListener("click", () => performQuickLogin("admin", "admin"));
+    }
+
     // Sidebar LOGOUT Button
     if (el.btnLogoutBtn) {
       el.btnLogoutBtn.addEventListener("click", (e) => {
@@ -1997,130 +1409,163 @@
     // Path suggestions pills in Open Project modal
     document.querySelectorAll(".path-pill-btn[data-fill]").forEach(pill => {
       pill.addEventListener("click", () => {
-        document.getElementById("inputProjectPath").value = pill.getAttribute("data-fill");
+        const inp = document.getElementById("inputProjectPath");
+        if (inp) inp.value = pill.getAttribute("data-fill");
       });
     });
 
     // Submit: Open Project (Lưu vào CSDL)
-    el.formOpenProject.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const path = document.getElementById("inputProjectPath").value;
-      const name = document.getElementById("inputProjectName").value;
-      const language = document.getElementById("inputProjectLang").value;
-      const description = document.getElementById("inputProjectDesc").value;
+    if (el.formOpenProject) {
+      el.formOpenProject.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const path = document.getElementById("inputProjectPath").value.trim();
+        const name = document.getElementById("inputProjectName").value.trim();
+        const language = document.getElementById("inputProjectLang") ? document.getElementById("inputProjectLang").value.trim() : "Java";
+        const description = document.getElementById("inputProjectDesc") ? document.getElementById("inputProjectDesc").value.trim() : "";
 
-      try {
-        const newProj = await window.apiClient.createProject({ name, path, language, description });
-        closeModals();
-        await loadDatabaseData();
-        selectTask(null, newProj);
-      } catch (err) {
-        alert("Lỗi khi tạo dự án vào CSDL: " + err.message);
-      }
-    });
+        if (state.projects.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+          alert(`Dự án với tên "${name}" đã tồn tại trong tài khoản của bạn. Vui lòng chọn tên khác để tránh nhầm lẫn!`);
+          return;
+        }
+
+        try {
+          const newProj = await window.apiClient.createProject({ name, path, language, description });
+          closeModals();
+          await loadDatabaseData();
+          selectProjectWorkspace(newProj);
+        } catch (err) {
+          alert("Lỗi khi tạo dự án vào CSDL: " + err.message);
+        }
+      });
+    }
 
     // Submit: Create AI Review Task (Lưu vào CSDL & chạy ngầm)
-    el.formCreateTask.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const projectId = Number(document.getElementById("selectTaskProject").value);
-      if (!projectId) {
-        alert("Vui lòng chọn dự án trước!");
-        return;
-      }
-      const type = document.getElementById("selectTaskType").value;
-      const focus = document.getElementById("selectTaskFocus").value;
-      const model = document.getElementById("selectTaskModel") ? document.getElementById("selectTaskModel").value : "";
-      const prompt = document.getElementById("inputTaskPrompt") ? document.getElementById("inputTaskPrompt").value.trim() : "";
-      const selectedTools = Array.from(document.querySelectorAll('input[name="taskTools"]:checked')).map(cb => cb.value);
-
-      const project = state.projects.find(p => p.id === projectId);
-      closeModals();
-
-      try {
-        const newTask = await window.apiClient.createTask({
-          projectId: projectId,
-          projectName: project ? project.name : "Dự án",
-          type: type,
-          input: { projectPath: project ? project.path : "D:/AI Agent/aiagent/aiagent", focus: focus },
-          selectedTools: selectedTools.length > 0 ? selectedTools : undefined,
-          model: model || undefined,
-          prompt: prompt || undefined
-        });
-
-        await loadDatabaseData();
-        if (project) {
-          selectTask(newTask, project);
+    if (el.formCreateTask) {
+      el.formCreateTask.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const selTaskProj = document.getElementById("selectTaskProject");
+        const projectId = selTaskProj ? Number(selTaskProj.value) : null;
+        if (!projectId) {
+          alert("Vui lòng chọn dự án trước!");
+          return;
         }
-      } catch (err) {
-        alert("Lỗi khi tạo tác vụ AI: " + err.message);
-      }
-    });
+        const type = document.getElementById("selectTaskType") ? document.getElementById("selectTaskType").value : "CODE_REVIEW";
+        const focus = document.getElementById("selectTaskFocus") ? document.getElementById("selectTaskFocus").value : "";
+        const model = document.getElementById("selectTaskModel") ? document.getElementById("selectTaskModel").value : "";
+        const prompt = document.getElementById("inputTaskPrompt") ? document.getElementById("inputTaskPrompt").value.trim() : "";
+        const selectedTools = Array.from(document.querySelectorAll('input[name="taskTools"]:checked')).map(cb => cb.value);
+
+        const project = state.projects.find(p => p.id === projectId);
+        closeModals();
+
+        try {
+          const newTask = await window.apiClient.createTask({
+            projectId: projectId,
+            projectName: project ? project.name : "Dự án",
+            type: type,
+            input: { projectPath: project ? project.path : "D:/AI Agent/aiagent/aiagent", focus: focus },
+            selectedTools: selectedTools.length > 0 ? selectedTools : undefined,
+            model: model || undefined,
+            prompt: prompt || undefined
+          });
+
+          await loadDatabaseData();
+          if (project) {
+            selectTask(newTask, project);
+          }
+        } catch (err) {
+          alert("Lỗi khi tạo tác vụ AI: " + err.message);
+        }
+      });
+    }
 
     // Auth Tabs (Login vs Register)
-    el.tabAuthLogin.addEventListener("click", () => {
-      el.tabAuthLogin.classList.add("active");
-      el.tabAuthRegister.classList.remove("active");
-      el.formLogin.style.display = "block";
-      el.formRegister.style.display = "none";
-    });
+    if (el.tabAuthLogin) {
+      el.tabAuthLogin.addEventListener("click", () => {
+        el.tabAuthLogin.classList.add("active");
+        if (el.tabAuthRegister) el.tabAuthRegister.classList.remove("active");
+        if (el.formLogin) el.formLogin.style.display = "block";
+        if (el.formRegister) el.formRegister.style.display = "none";
+      });
+    }
 
-    el.tabAuthRegister.addEventListener("click", () => {
-      el.tabAuthRegister.classList.add("active");
-      el.tabAuthLogin.classList.remove("active");
-      el.formRegister.style.display = "block";
-      el.formLogin.style.display = "none";
-    });
+    if (el.tabAuthRegister) {
+      el.tabAuthRegister.addEventListener("click", () => {
+        el.tabAuthRegister.classList.add("active");
+        if (el.tabAuthLogin) el.tabAuthLogin.classList.remove("active");
+        if (el.formRegister) el.formRegister.style.display = "block";
+        if (el.formLogin) el.formLogin.style.display = "none";
+      });
+    }
 
     // Submit: Login Form
-    el.formLogin.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const u = document.getElementById("loginUsername").value.trim();
-      const p = document.getElementById("loginPassword").value;
-      const submitBtn = el.formLogin.querySelector("button[type='submit']");
-      const originalText = submitBtn.textContent;
+    if (el.formLogin) {
+      el.formLogin.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const u = document.getElementById("loginUsername").value.trim();
+        const p = document.getElementById("loginPassword").value;
+        const submitBtn = el.formLogin.querySelector("button[type='submit']");
+        const originalText = submitBtn ? submitBtn.textContent : "";
 
-      try {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "Đang kiểm tra...";
-        await window.apiClient.login(u, p);
-        closeModals();
-        state.currentUser = window.apiClient.getCurrentUser();
-        updateUserDisplays();
-        await checkConnection();
-        await loadDatabaseData();
-      } catch (err) {
-        alert("Đăng nhập thất bại: " + (err.message || "Tài khoản hoặc mật khẩu không chính xác"));
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-      }
-    });
+        try {
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Đang kiểm tra...";
+          }
+          await window.apiClient.login(u, p);
+          closeModals();
+          clearChatSessionState();
+          state.currentUser = window.apiClient.getCurrentUser();
+          state.view = "welcome";
+          updateUserDisplays();
+          await checkConnection();
+          await loadDatabaseData();
+          renderView();
+        } catch (err) {
+          alert("Đăng nhập thất bại: " + (err.message || "Tài khoản hoặc mật khẩu không chính xác"));
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+        }
+      });
+    }
 
     // Submit: Register Form
-    el.formRegister.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const u = document.getElementById("regUsername").value.trim();
-      const email = document.getElementById("regEmail").value.trim();
-      const p = document.getElementById("regPassword").value;
-      const submitBtn = el.formRegister.querySelector("button[type='submit']");
-      const originalText = submitBtn.textContent;
+    if (el.formRegister) {
+      el.formRegister.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const u = document.getElementById("regUsername").value.trim();
+        const email = document.getElementById("regEmail").value.trim();
+        const p = document.getElementById("regPassword").value;
+        const submitBtn = el.formRegister.querySelector("button[type='submit']");
+        const originalText = submitBtn ? submitBtn.textContent : "";
 
-      try {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "Đang đăng ký...";
-        await window.apiClient.register(u, email, p);
-        closeModals();
-        state.currentUser = window.apiClient.getCurrentUser();
-        updateUserDisplays();
-        await checkConnection();
-        await loadDatabaseData();
-      } catch (err) {
-        alert("Đăng ký thất bại: " + (err.message || "Kiểm tra lại thông tin đăng ký"));
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-      }
-    });
+        try {
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Đang đăng ký...";
+          }
+          await window.apiClient.register(u, email, p);
+          closeModals();
+          clearChatSessionState();
+          state.currentUser = window.apiClient.getCurrentUser();
+          state.view = "welcome";
+          updateUserDisplays();
+          await checkConnection();
+          await loadDatabaseData();
+          renderView();
+        } catch (err) {
+          alert("Đăng ký thất bại: " + (err.message || "Kiểm tra lại thông tin đăng ký"));
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+        }
+      });
+    }
 
     // Keyboard Shortcuts (Enter on Welcome -> Open Project; Ctrl+K -> Search)
     document.addEventListener("keydown", (e) => {
@@ -2160,8 +1605,11 @@
   async function init() {
     applyTheme(state.theme);
     initEventListeners();
+    state.view = state.currentUser ? "welcome" : "landing";
+    renderView();
     await checkConnection();
     await loadDatabaseData();
+    renderView();
   }
 
   document.addEventListener("DOMContentLoaded", init);

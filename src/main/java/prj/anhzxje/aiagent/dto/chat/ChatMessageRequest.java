@@ -20,5 +20,6 @@ public class ChatMessageRequest {
     private String message;
 
     private Long conversationId;
+    private Long projectId;
     private String model;
 }

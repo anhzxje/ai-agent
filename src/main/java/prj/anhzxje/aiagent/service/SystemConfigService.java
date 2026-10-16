@@ -2,6 +2,13 @@ package prj.anhzxje.aiagent.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.google.genai.Client;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.google.genai.GoogleGenAiChatModel;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
+import org.springframework.ai.model.tool.ToolCallingManager;
+import org.springframework.core.retry.RetryTemplate;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,9 +78,44 @@ public class SystemConfigService {
     }
 
     /**
+     * Kiểm tra xem Quản trị viên có cấu hình API Key tùy chỉnh trong CSDL hay không.
+     */
+    @Transactional(readOnly = true)
+    public boolean hasCustomApiKey() {
+        return systemSettingRepository.findBySettingKey(KEY_GEMINI_API_KEY)
+                .map(SystemSetting::getSettingValue)
+                .filter(s -> !s.isBlank())
+                .isPresent();
+    }
+
+    /**
+     * Tạo hoặc tùy biến ChatClient.Builder với API Key có hiệu lực ở runtime.
+     * Nếu có API Key riêng trong CSDL (khác với biến môi trường), khởi tạo ChatClient
+     * trỏ đến Google GenAI client sử dụng API Key đó.
+     * Nếu không có API Key riêng hoặc trong môi trường test (fallback), sử dụng defaultBuilder.
+     */
+    public ChatClient.Builder getChatClientBuilder(ChatClient.Builder defaultBuilder) {
+        String effectiveKey = getEffectiveApiKey();
+        if (effectiveKey != null && !effectiveKey.isBlank() && !effectiveKey.equals(envApiKey)) {
+            try {
+                Client client = Client.builder().apiKey(effectiveKey).build();
+                GoogleGenAiChatOptions options = GoogleGenAiChatOptions.builder().build();
+                RetryTemplate retryTemplate = new RetryTemplate();
+                ObservationRegistry registry = ObservationRegistry.NOOP;
+                ToolCallingManager toolCallingManager = ToolCallingManager.builder().build();
+                GoogleGenAiChatModel chatModel = new GoogleGenAiChatModel(client, options, toolCallingManager, retryTemplate, registry);
+                return ChatClient.builder(chatModel);
+            } catch (Throwable e) {
+                log.warn("Không thể khởi tạo custom Google GenAI Client với custom API Key, fallback về defaultBuilder: {}", e.getMessage());
+            }
+        }
+        return defaultBuilder;
+    }
+
+    /**
      * Lấy danh sách mô hình AI được cấp phép sử dụng trong hệ thống.
      * Phân tách chuỗi lưu trữ phân tách bằng dấu phẩy trong CSDL thành List<String>.
-     * Fallback về danh sách các model tối ưu: gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-2.5-flash-lite, gemini-2.5-flash.
+     * Fallback về danh sách các model tối ưu: gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-2.5-flash.
      */
     @Transactional(readOnly = true)
     public List<String> getAllowedModels() {
@@ -83,7 +125,7 @@ public class SystemConfigService {
                         .filter(str -> !str.isEmpty())
                         .collect(Collectors.toList()))
                 .filter(list -> !list.isEmpty())
-                .orElse(List.of("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-2.5-flash"));
+                .orElse(List.of("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash"));
     }
 
     /**

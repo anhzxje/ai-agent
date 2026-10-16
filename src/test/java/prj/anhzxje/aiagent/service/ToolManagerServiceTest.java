@@ -103,4 +103,35 @@ class ToolManagerServiceTest {
         // Chỉ có list_directory được cấp phép, grep bị loại bỏ
         assertEquals(1, tools.size());
     }
+
+    @Test
+    void testResolveActiveTools_WithAllowedSandboxPath() {
+        when(toolConfigRepository.findByEnabledTrue()).thenReturn(List.of(listDirTool));
+        org.springframework.test.util.ReflectionTestUtils.setField(toolManagerService, "allowedPaths",
+                List.of(System.getProperty("user.dir")));
+
+        List<Object> tools = toolManagerService.resolveActiveTools(
+                List.of("list_directory"), System.getProperty("user.dir"));
+
+        assertNotNull(tools);
+        assertEquals(1, tools.size());
+    }
+
+    @Test
+    void testResolveActiveTools_WithDisallowedSandboxPath_ThrowsSecurityException() {
+        org.springframework.test.util.ReflectionTestUtils.setField(toolManagerService, "allowedPaths",
+                List.of(System.getProperty("user.dir")));
+
+        assertThrows(SecurityException.class, () ->
+                toolManagerService.resolveActiveTools(List.of("list_directory"), "C:/Windows/System32"));
+    }
+
+    @Test
+    void testResolveActiveTools_WithPathTraversal_ThrowsSecurityException() {
+        org.springframework.test.util.ReflectionTestUtils.setField(toolManagerService, "allowedPaths",
+                List.of(System.getProperty("user.dir")));
+
+        assertThrows(SecurityException.class, () ->
+                toolManagerService.resolveActiveTools(List.of("list_directory"), System.getProperty("user.dir") + "/../../sensitive"));
+    }
 }

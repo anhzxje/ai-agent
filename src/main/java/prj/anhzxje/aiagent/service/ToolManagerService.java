@@ -12,7 +12,10 @@ import prj.anhzxje.aiagent.dto.admin.AgentToolDto;
 import prj.anhzxje.aiagent.entity.AgentToolConfig;
 import prj.anhzxje.aiagent.exception.ResourceNotFoundException;
 import prj.anhzxje.aiagent.repository.AgentToolConfigRepository;
+import org.springframework.beans.factory.annotation.Value;
 
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,6 +34,9 @@ public class ToolManagerService {
 
     private final AgentToolConfigRepository toolConfigRepository;
     private final AuditLogService auditLogService;
+
+    @Value("${agent.allowed-paths:#{T(java.util.Collections).emptyList()}}")
+    private List<String> allowedPaths;
 
     /**
      * Lấy toàn bộ danh sách công cụ AI và trạng thái bật/tắt hiện tại trong CSDL.
@@ -98,8 +104,65 @@ public class ToolManagerService {
      *     + "grep": Tìm kiếm chuỗi/regex trong nội dung các tệp tin.
      * - Bước 4: Trả về danh sách đối tượng Tool sẵn sàng cho ChatClient thực thi Function Calling.
      */
+    /**
+     * Kiểm tra đường dẫn mục tiêu có hợp lệ và nằm trong danh sách được cấp phép (Sandbox) hay không.
+     */
+    public boolean isPathAllowed(Path targetPath) {
+        if (allowedPaths == null || allowedPaths.isEmpty()) {
+            return true;
+        }
+        if (targetPath == null) {
+            return false;
+        }
+        try {
+            Path normalized = targetPath.toAbsolutePath().normalize();
+            if (normalized.toString().contains("..")) {
+                return false;
+            }
+            for (String allowed : allowedPaths) {
+                Path normAllowed = Path.of(allowed).toAbsolutePath().normalize();
+                if (normalized.startsWith(normAllowed)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi kiểm tra sandbox path: {}", e.getMessage());
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Tương thích ngược: Phân giải tool không truyền basePath.
+     */
     @Transactional(readOnly = true)
     public List<Object> resolveActiveTools(List<String> userSelectedTools) {
+        return resolveActiveTools(userSelectedTools, null);
+    }
+
+    /**
+     * Phân giải danh sách thực thể Tool thực tế (Tool Instances) để chuyển cho Spring AI ChatClient.
+     * Quy trình xử lý theo nguyên tắc Bảo mật đa tầng (Defense in depth):
+     * - Bước 1: Kiểm tra Sandbox path đối với basePath của dự án.
+     * - Bước 2: Lấy danh sách tên công cụ đang ĐƯỢC PHÉP hoạt động ở cấp Quản trị viên (Admin Master Switch) từ CSDL.
+     * - Bước 3: Giao thoa (Intersection) giữa công cụ người dùng yêu cầu (userSelectedTools) và công cụ Admin cho phép.
+     * - Bước 4: Khởi tạo các đối tượng Tool thực tế gắn với workingDirectory / allowedDirectory an toàn.
+     */
+    @Transactional(readOnly = true)
+    public List<Object> resolveActiveTools(List<String> userSelectedTools, String basePathStr) {
+        Path basePath = null;
+        if (basePathStr != null && !basePathStr.isBlank()) {
+            try {
+                Path normBase = Path.of(basePathStr).toAbsolutePath().normalize();
+                if (!isPathAllowed(normBase)) {
+                    throw new SecurityException("Đường dẫn dự án không nằm trong danh sách thư mục được cấp phép (agent.allowed-paths): " + basePathStr);
+                }
+                basePath = normBase;
+            } catch (InvalidPathException e) {
+                throw new SecurityException("Đường dẫn dự án không hợp lệ: " + basePathStr, e);
+            }
+        }
+
         // Bước 1: Lấy danh sách các công cụ đang bật ở cấp Admin (Master Switch)
         Set<String> enabledNames = toolConfigRepository.findByEnabledTrue().stream()
                 .map(AgentToolConfig::getToolName)
@@ -110,20 +173,42 @@ public class ToolManagerService {
         if (userSelectedTools != null && !userSelectedTools.isEmpty()) {
             finalAllowed = userSelectedTools.stream()
                     .map(String::toLowerCase)
-                    .filter(enabledNames::contains) // Chỉ giữ lại tool nằm trong danh sách Admin cho phép
+                    .filter(enabledNames::contains)
                     .collect(Collectors.toSet());
         } else {
-            finalAllowed = enabledNames; // Nếu user không chỉ định cụ thể, kích hoạt toàn bộ tool Admin cho phép
+            finalAllowed = enabledNames;
         }
 
-        // Bước 3: Khởi tạo các instance Tool tương ứng cung cấp cho Spring AI
+        // Bước 3: Khởi tạo các instance Tool tương ứng cung cấp cho Spring AI kèm Sandbox
         List<Object> tools = new ArrayList<>();
         for (String name : finalAllowed) {
             switch (name) {
-                case "list_directory" -> tools.add(ListDirectoryTool.builder().build());
-                case "glob" -> tools.add(GlobTool.builder().build());
-                case "file_system" -> tools.add(FileSystemTools.builder().build());
-                case "grep" -> tools.add(GrepTool.builder().build());
+                case "list_directory" -> {
+                    var b = ListDirectoryTool.builder();
+                    if (basePath != null) b.workingDirectory(basePath);
+                    tools.add(b.build());
+                }
+                case "glob" -> {
+                    var b = GlobTool.builder();
+                    if (basePath != null) b.workingDirectory(basePath);
+                    tools.add(b.build());
+                }
+                case "file_system" -> {
+                    var b = FileSystemTools.builder();
+                    if (basePath != null) {
+                        b.allowedDirectory(basePath);
+                    } else if (allowedPaths != null && !allowedPaths.isEmpty()) {
+                        b.allowedDirectories(allowedPaths.stream()
+                                .map(p -> Path.of(p).toAbsolutePath().normalize())
+                                .toArray(Path[]::new));
+                    }
+                    tools.add(b.build());
+                }
+                case "grep" -> {
+                    var b = GrepTool.builder();
+                    if (basePath != null) b.workingDirectory(basePath);
+                    tools.add(b.build());
+                }
                 default -> log.warn("Không rõ loại tool: {}", name);
             }
         }
