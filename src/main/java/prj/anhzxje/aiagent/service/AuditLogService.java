@@ -3,6 +3,7 @@ package prj.anhzxje.aiagent.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import prj.anhzxje.aiagent.dto.admin.AuditLogResponse;
 import prj.anhzxje.aiagent.entity.AuditLog;
@@ -33,7 +34,7 @@ public class AuditLogService {
      * @param action   mã hành động nghiệp vụ (LOGIN, REGISTER, CREATE_TASK, UPDATE_ROLE, ...)
      * @param details  chi tiết mô tả nội dung hành động
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(String username, String action, String details) {
         log(username, action, details, null);
     }
@@ -41,30 +42,39 @@ public class AuditLogService {
     /**
      * Ghi nhật ký kiểm toán chi tiết kèm địa chỉ IP client.
      * Thiết kế phòng vệ (Defensive Logging):
-     * Khối try-catch bao bọc việc lưu AuditLog để đảm bảo rằng nếu quá trình ghi log gặp sự cố
-     * (ví dụ: lỗi kết nối tạm thời, chuỗi chi tiết quá dài...), lỗi này sẽ KHÔNG làm văng ngoại lệ
-     * khiến giao dịch chính của người dùng (Đăng ký, Đăng nhập, Tạo Task...) bị rollback ngoài ý muốn.
+     * 1. Áp dụng Propagation.REQUIRES_NEW để việc ghi audit log diễn ra trong một sub-transaction hoàn toàn
+     *    độc lập. Nếu xảy ra sự cố trong lúc ghi log, nó tuyệt đối KHÔNG làm đánh dấu rollback giao dịch của
+     *    luồng nghiệp vụ chính của người dùng (Đăng ký, Đăng nhập, Tạo Task, Đổi mật khẩu...).
+     * 2. Tự động cắt ngắn (Sanitize/Truncate) nếu độ dài chuỗi vượt quá schema CSDL để chống lỗi DataTruncation.
      *
      * @param username  tên tài khoản người thực hiện hành động
      * @param action    mã hành động nghiệp vụ
      * @param details   chi tiết mô tả nội dung hành động
      * @param ipAddress địa chỉ IP của client gửi yêu cầu (có thể null)
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(String username, String action, String details, String ipAddress) {
         try {
-            // Bước 1: Khởi tạo thực thể AuditLog, gán giá trị 'ANONYMOUS' nếu chưa xác định danh tính
+            // Cắt ngắn an toàn để không vượt kích thước cột database (length = 50 cho username/action, 2000 cho details)
+            String safeUsername = username != null ? (username.length() > 50 ? username.substring(0, 50) : username) : "ANONYMOUS";
+            String safeAction = action != null ? (action.length() > 50 ? action.substring(0, 50) : action) : "UNKNOWN";
+            String safeDetails = details;
+            if (safeDetails != null && safeDetails.length() > 2000) {
+                safeDetails = safeDetails.substring(0, 1997) + "...";
+            }
+
+            // Bước 1: Khởi tạo thực thể AuditLog
             AuditLog entry = AuditLog.builder()
-                    .username(username != null ? username : "ANONYMOUS")
-                    .action(action)
-                    .details(details)
+                    .username(safeUsername)
+                    .action(safeAction)
+                    .details(safeDetails)
                     .ipAddress(ipAddress)
                     .createdAt(LocalDateTime.now())
                     .build();
 
             // Bước 2: Lưu nhật ký vào bảng audit_logs trong MySQL
             auditLogRepository.save(entry);
-            log.info("[AUDIT] User: '{}' | Action: '{}' | Details: '{}'", username, action, details);
+            log.info("[AUDIT] User: '{}' | Action: '{}' | Details: '{}'", safeUsername, safeAction, safeDetails);
         } catch (Exception e) {
             // Bước 3: Nuốt lỗi và ghi log error cục bộ, bảo vệ toàn vẹn luồng nghiệp vụ chính
             log.error("Không thể ghi audit log [user={}, action={}]: {}", username, action, e.getMessage());

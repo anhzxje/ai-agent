@@ -22,7 +22,7 @@ import java.util.List;
  * Khởi tạo dữ liệu gốc (Seed Data) khi ứng dụng chạy lần đầu tiên:
  * 1. Tài khoản quản trị viên mặc định: admin / admin (Mật khẩu được mã hóa BCrypt).
  * 2. Cấu hình các công cụ AI Agent (ListDirectory, Glob, FileSystem, Grep) vào CSDL.
- * 3. Cấu hình hệ thống (Active Model mặc định: gemini-2.5-flash-lite, danh sách model được phép).
+ * 3. Cấu hình hệ thống (Active Model mặc định: gemini-3.5-flash-lite, danh sách model được phép).
  * 
  * Implement CommandLineRunner để chạy tự động ngay sau khi ApplicationContext sẵn sàng.
  */
@@ -162,15 +162,24 @@ public class DataInitializer implements CommandLineRunner {
                     .description("Model Gemini đang kích hoạt cho AI Agent (Mặc định: gemini-3.5-flash-lite)")
                     .updatedAt(LocalDateTime.now())
                     .build());
+        } else {
+            // Auto-migration: cập nhật active model nếu đang dùng model deprecated (gemini-2.5-flash-lite, gemini-1.5-flash...)
+            var setting = modelSetting.get();
+            if (setting.getSettingValue() != null &&
+                    (setting.getSettingValue().contains("gemini-2.5-flash-lite") || setting.getSettingValue().contains("gemini-1.5-flash"))) {
+                log.info("Auto-migration: Chuyển active model từ '{}' sang 'gemini-3.5-flash-lite' (model cũ đã bị ngừng hỗ trợ)", setting.getSettingValue());
+                setting.setSettingValue("gemini-3.5-flash-lite");
+                setting.setUpdatedAt(LocalDateTime.now());
+                systemSettingRepository.save(setting);
+            }
         }
 
         // Danh sách 3 model mạnh nhất, nhanh nhất, ổn định và miễn phí từ Google AI Studio Quota:
         // 1. gemini-3.5-flash-lite: 500 RPD, 15 RPM, siêu nhanh (Mặc định)
         // 2. gemini-3.1-flash-lite: 500 RPD, 15 RPM, thế hệ 3.1 mới nhất & ổn định
-        // 3. gemini-2.5-flash-lite: 20 RPD, 10 RPM, tiết kiệm token
         // Kèm theo gemini-2.5-flash: 20 RPD, 5 RPM, lập luận chuyên sâu
         var allowedSetting = systemSettingRepository.findBySettingKey(SystemConfigService.KEY_ALLOWED_MODELS);
-        String supportedList = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-2.5-flash";
+        String supportedList = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash";
         if (allowedSetting.isEmpty()) {
             systemSettingRepository.save(SystemSetting.builder()
                     .settingKey(SystemConfigService.KEY_ALLOWED_MODELS)
@@ -180,8 +189,8 @@ public class DataInitializer implements CommandLineRunner {
                     .build());
         } else {
             var setting = allowedSetting.get();
-            // Cập nhật lại danh sách nếu cấu hình cũ chưa chứa gemini-3.5-flash-lite hoặc còn model lỗi
-            if (setting.getSettingValue() == null || !setting.getSettingValue().contains("gemini-3.5-flash-lite") || setting.getSettingValue().contains("gemini-1.5-flash")) {
+            // Cập nhật lại danh sách nếu cấu hình cũ chưa chứa gemini-3.5-flash-lite, còn model lỗi, hoặc còn model deprecated
+            if (setting.getSettingValue() == null || !setting.getSettingValue().contains("gemini-3.5-flash-lite") || setting.getSettingValue().contains("gemini-1.5-flash") || setting.getSettingValue().contains("gemini-2.5-flash-lite")) {
                 setting.setSettingValue(supportedList);
                 setting.setUpdatedAt(LocalDateTime.now());
                 systemSettingRepository.save(setting);

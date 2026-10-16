@@ -14,6 +14,13 @@ import prj.anhzxje.aiagent.repository.AgentTaskRepository;
 import prj.anhzxje.aiagent.repository.ProjectRepository;
 import prj.anhzxje.aiagent.security.CustomUserDetails;
 
+import org.springframework.beans.factory.annotation.Value;
+import prj.anhzxje.aiagent.entity.ChatConversation;
+import prj.anhzxje.aiagent.repository.ChatConversationRepository;
+import prj.anhzxje.aiagent.repository.ChatMessageRepository;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,6 +32,11 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final AgentTaskRepository agentTaskRepository;
+    private final ChatConversationRepository chatConversationRepository;
+    private final ChatMessageRepository chatMessageRepository;
+
+    @Value("${agent.allowed-paths:#{T(java.util.Collections).emptyList()}}")
+    private List<String> allowedPaths;
 
     /**
      * Lấy danh sách toàn bộ project thuộc quyền sở hữu của người dùng đang đăng nhập.
@@ -54,79 +66,171 @@ public class ProjectService {
 
     /**
      * Tạo mới một dự án và gán quyền sở hữu cho người dùng hiện tại.
-     * Quy trình:
-     * - Bước 1: Trích xuất user đang thao tác từ Security Context.
-     * - Bước 2: Khởi tạo đối tượng Project với các trường name, description, path (đường dẫn thư mục mã nguồn) và language.
-     * - Bước 3: Gán user vào trường quan hệ Many-to-One (@ManyToOne) của Project.
-     * - Bước 4: Lưu xuống CSDL thông qua projectRepository và ghi log thông tin.
-     * - Bước 5: Chuyển đổi sang ProjectResponse trả về client.
+     * Kiểm tra chặt chẽ:
+     * 1. Thư mục mã nguồn phải có thật trên hệ thống (Files.exists & Files.isDirectory).
+     * 2. Thư mục phải nằm trong danh mục Sandbox cho phép (agent.allowed-paths).
+     * 3. Tên dự án không được trùng lặp trong tài khoản người dùng.
+     * 4. Đường dẫn dự án không được trùng lặp với dự án đã liên kết trước đó.
      */
     @Transactional
     public ProjectResponse createProject(ProjectRequest request) {
         User currentUser = getCurrentUser();
 
-        // Bước 2 & 3: Tạo entity Project liên kết với user hiện tại
+        // Chuẩn hóa và kiểm tra đường dẫn thư mục
+        String rawPath = request.getPath() != null ? request.getPath().trim() : "";
+        if (rawPath.isBlank()) {
+            throw new IllegalArgumentException("Đường dẫn thư mục dự án không được để trống");
+        }
+
+        Path dirPath;
+        try {
+            dirPath = Path.of(rawPath).toAbsolutePath().normalize();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Đường dẫn thư mục dự án không hợp lệ: " + rawPath);
+        }
+
+        if (!Files.exists(dirPath)) {
+            throw new IllegalArgumentException("Thư mục dự án không tồn tại trên hệ thống: " + rawPath);
+        }
+        if (!Files.isDirectory(dirPath)) {
+            throw new IllegalArgumentException("Đường dẫn cung cấp không phải là một thư mục hợp lệ: " + rawPath);
+        }
+
+        // Kiểm tra an toàn Sandbox
+        validateSandboxPath(dirPath, rawPath);
+
+        // Kiểm tra trùng lặp tên dự án
+        String trimmedName = request.getName() != null ? request.getName().trim() : "";
+        if (trimmedName.isBlank()) {
+            throw new IllegalArgumentException("Tên dự án không được để trống");
+        }
+        if (projectRepository.existsByUserIdAndNameIgnoreCase(currentUser.getId(), trimmedName)) {
+            throw new IllegalArgumentException("Dự án với tên '" + trimmedName + "' đã tồn tại trong tài khoản của bạn. Vui lòng chọn tên khác để tránh nhầm lẫn.");
+        }
+
+        // Kiểm tra trùng lặp đường dẫn dự án
+        String normPathStr = dirPath.toString().replace('\\', '/');
+        if (projectRepository.existsByUserIdAndPath(currentUser.getId(), normPathStr) ||
+            projectRepository.existsByUserIdAndPath(currentUser.getId(), rawPath)) {
+            throw new IllegalArgumentException("Thư mục mã nguồn này đã được liên kết với một dự án khác trong tài khoản của bạn.");
+        }
+
+        // Tạo entity Project liên kết với user hiện tại
         Project project = Project.builder()
-                .name(request.getName())
+                .name(trimmedName)
                 .description(request.getDescription())
-                .path(request.getPath())
-                .language(request.getLanguage())
+                .path(normPathStr)
+                .language(request.getLanguage() != null && !request.getLanguage().isBlank() ? request.getLanguage().trim() : "Đa ngôn ngữ")
                 .user(currentUser)
                 .build();
 
-        // Bước 4: Lưu project vào database
         Project saved = projectRepository.save(project);
-        log.info("Đã tạo project '{}' cho user '{}'", saved.getName(), currentUser.getUsername());
-        
-        // Bước 5: Trả về DTO kết quả
+        log.info("Đã tạo project '{}' (path={}) cho user '{}'", saved.getName(), saved.getPath(), currentUser.getUsername());
         return toResponse(saved);
     }
 
     /**
      * Cập nhật thông tin dự án hiện có.
-     * Quy trình:
-     * - Bước 1: Tìm kiếm dự án và xác minh quyền sở hữu của user hiện tại.
-     * - Bước 2: Cập nhật các trường thông tin mới (name, description, path, language).
-     * - Bước 3: Lưu thay đổi xuống CSDL và ghi nhận log hệ thống.
      */
     @Transactional
     public ProjectResponse updateProject(Long projectId, ProjectRequest request) {
-        // Bước 1: Xác minh user sở hữu dự án này
         Project project = findProjectAndVerifyOwner(projectId);
+        User currentUser = getCurrentUser();
 
-        // Bước 2: Cập nhật các giá trị mới từ Request
-        project.setName(request.getName());
+        String rawPath = request.getPath() != null ? request.getPath().trim() : "";
+        if (rawPath.isBlank()) {
+            throw new IllegalArgumentException("Đường dẫn thư mục dự án không được để trống");
+        }
+
+        Path dirPath;
+        try {
+            dirPath = Path.of(rawPath).toAbsolutePath().normalize();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Đường dẫn thư mục dự án không hợp lệ: " + rawPath);
+        }
+
+        if (!Files.exists(dirPath)) {
+            throw new IllegalArgumentException("Thư mục dự án không tồn tại trên hệ thống: " + rawPath);
+        }
+        if (!Files.isDirectory(dirPath)) {
+            throw new IllegalArgumentException("Đường dẫn cung cấp không phải là một thư mục: " + rawPath);
+        }
+
+        validateSandboxPath(dirPath, rawPath);
+
+        String trimmedName = request.getName() != null ? request.getName().trim() : "";
+        if (trimmedName.isBlank()) {
+            throw new IllegalArgumentException("Tên dự án không được để trống");
+        }
+        if (projectRepository.existsByUserIdAndNameIgnoreCaseAndIdNot(currentUser.getId(), trimmedName, projectId)) {
+            throw new IllegalArgumentException("Dự án với tên '" + trimmedName + "' đã được sử dụng ở dự án khác của bạn.");
+        }
+
+        String normPathStr = dirPath.toString().replace('\\', '/');
+        if (projectRepository.existsByUserIdAndPathAndIdNot(currentUser.getId(), normPathStr, projectId)) {
+            throw new IllegalArgumentException("Đường dẫn này đã được liên kết với một dự án khác của bạn.");
+        }
+
+        project.setName(trimmedName);
         project.setDescription(request.getDescription());
-        project.setPath(request.getPath());
-        project.setLanguage(request.getLanguage());
+        project.setPath(normPathStr);
+        project.setLanguage(request.getLanguage() != null && !request.getLanguage().isBlank() ? request.getLanguage().trim() : "Đa ngôn ngữ");
 
-        // Bước 3: Lưu cập nhật vào CSDL
         Project saved = projectRepository.save(project);
-        log.info("Đã cập nhật project '{}'", saved.getName());
+        log.info("Đã cập nhật project id={} ('{}')", projectId, saved.getName());
         return toResponse(saved);
     }
 
     /**
-     * Xóa một dự án khỏi hệ thống.
-     * Quy trình:
-     * - Bước 1: Tìm kiếm dự án và xác minh quyền sở hữu của user hiện tại.
-     * - Bước 2: Xóa thực thể Project khỏi CSDL (các task liên quan nếu có cấu hình cascade sẽ được xử lý tương ứng).
-     * - Bước 3: Ghi log xác nhận đã xóa thành công.
+     * Xóa vĩnh viễn dự án khỏi hệ thống.
+     * Cascade sạch sẽ:
+     * 1. Xóa toàn bộ Agent Tasks của dự án này.
+     * 2. Xóa toàn bộ Chat Conversations và tin nhắn thuộc dự án này.
+     * 3. Xóa bản ghi Project.
      */
     @Transactional
     public void deleteProject(Long projectId) {
-        // Bước 1: Xác minh quyền sở hữu
         Project project = findProjectAndVerifyOwner(projectId);
-        
-        // Bước 2: Xóa toàn bộ các tác vụ AI liên quan để tránh lỗi khóa ngoại Foreign Key
+
+        // Bước 1: Xóa toàn bộ các tác vụ AI liên quan
         List<prj.anhzxje.aiagent.entity.AgentTask> tasks = agentTaskRepository.findByProjectId(projectId);
         if (!tasks.isEmpty()) {
             agentTaskRepository.deleteAll(tasks);
         }
 
+        // Bước 2: Xóa toàn bộ các phiên chat và tin nhắn liên quan đến dự án này
+        List<ChatConversation> convs = chatConversationRepository.findByProjectId(projectId);
+        for (ChatConversation c : convs) {
+            chatMessageRepository.deleteByConversationId(c.getId());
+        }
+        if (!convs.isEmpty()) {
+            chatConversationRepository.deleteAll(convs);
+        }
+
         // Bước 3: Xóa entity khỏi database
         projectRepository.delete(project);
-        log.info("Đã xóa project id={} cùng {} tác vụ liên quan", projectId, tasks.size());
+        log.info("Đã xóa hoàn tất project id={} cùng {} tác vụ và {} phiên chat liên quan",
+                projectId, tasks.size(), convs.size());
+    }
+
+    private void validateSandboxPath(Path dirPath, String rawPath) {
+        if (allowedPaths == null || allowedPaths.isEmpty()) {
+            return;
+        }
+        boolean allowed = false;
+        for (String allowedPrefix : allowedPaths) {
+            try {
+                Path normAllowed = Path.of(allowedPrefix).toAbsolutePath().normalize();
+                if (dirPath.startsWith(normAllowed) || dirPath.equals(normAllowed)) {
+                    allowed = true;
+                    break;
+                }
+            } catch (Exception ignored) {}
+        }
+        if (!allowed) {
+            throw new SecurityException("Đường dẫn thư mục dự án '" + rawPath +
+                    "' không nằm trong danh mục thư mục được cấp phép (Sandbox): " + allowedPaths);
+        }
     }
 
     // ────────────────────────────────────────────────

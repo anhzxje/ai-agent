@@ -13,7 +13,7 @@
  *    - Phân hệ Quản trị: /api/admin (Thống kê, Quản lý tài khoản, Bật/tắt tool, Cấu hình model/key, Audit log)
  *    - Phân hệ Trò chuyện: /api/chat (Hội thoại AI tương tác đa phiên, lưu lịch sử)
  * 3. Hỗ trợ tự động nhận diện môi trường:
- *    - Trình duyệt Web (qua localhost:8081 hoặc domain)
+ *    - Trình duyệt Web (qua localhost:8080 hoặc domain)
  *    - Ứng dụng Desktop Electron (.exe) với fallback ngoại tuyến mượt mà.
  * ============================================================================
  */
@@ -21,14 +21,15 @@ class AgentApiClient {
   constructor(baseUrl = "") {
     if (baseUrl) {
       this.baseUrl = baseUrl;
-    } else if (window.location.protocol.startsWith("http") && (window.location.port === "8081" || !window.location.port)) {
+    } else if (window.location.protocol.startsWith("http") && (window.location.port === "8080" || !window.location.port)) {
       this.baseUrl = window.location.origin;
     } else {
-      this.baseUrl = "http://localhost:8081";
+      this.baseUrl = "http://localhost:8080";
     }
     this.tokenKey = "ai_agent_jwt_token";
     this.userKey = "ai_agent_user";
     this.isBackendOnline = false;
+    this.isExplicitDemoMode = false;
   }
 
   getToken() {
@@ -86,15 +87,15 @@ class AgentApiClient {
         return true;
       }
     } catch (err) {
-      if (this.baseUrl !== "http://localhost:8081") {
+      if (this.baseUrl !== "http://localhost:8080") {
         try {
-          const res = await fetch("http://localhost:8081/api/projects", {
+          const res = await fetch("http://localhost:8080/api/projects", {
             method: "GET",
             headers: this.getHeaders(),
             signal: AbortSignal.timeout(1500)
           });
           if (res.status === 200 || res.status === 401 || res.status === 403) {
-            this.baseUrl = "http://localhost:8081";
+            this.baseUrl = "http://localhost:8080";
             this.isBackendOnline = true;
             return true;
           }
@@ -107,7 +108,7 @@ class AgentApiClient {
   }
 
   async login(username, password) {
-    const urls = [this.baseUrl, "http://localhost:8081"];
+    const urls = [this.baseUrl, "http://localhost:8080"];
     const unique = [...new Set(urls.filter(Boolean))];
 
     let lastErr = null;
@@ -144,11 +145,11 @@ class AgentApiClient {
       }
     }
 
-    throw new Error(lastErr ? (lastErr.message || "Không thể kết nối đến máy chủ Spring Boot (http://localhost:8081)") : "Lỗi kết nối máy chủ");
+    throw new Error(lastErr ? (lastErr.message || "Không thể kết nối đến máy chủ Spring Boot (http://localhost:8080)") : "Lỗi kết nối máy chủ");
   }
 
   async register(username, email, password) {
-    const urls = [this.baseUrl, "http://localhost:8081"];
+    const urls = [this.baseUrl, "http://localhost:8080"];
     const unique = [...new Set(urls.filter(Boolean))];
 
     let lastErr = null;
@@ -185,7 +186,7 @@ class AgentApiClient {
       }
     }
 
-    throw new Error(lastErr ? (lastErr.message || "Không thể kết nối đến máy chủ Spring Boot (http://localhost:8081)") : "Lỗi kết nối máy chủ");
+    throw new Error(lastErr ? (lastErr.message || "Không thể kết nối đến máy chủ Spring Boot (http://localhost:8080)") : "Lỗi kết nối máy chủ");
   }
 
   logout() {
@@ -200,15 +201,16 @@ class AgentApiClient {
       return [];
     }
 
-    if (!this.isBackendOnline) {
+    if (!this.isBackendOnline && this.isExplicitDemoMode) {
       return this.getUserLocalProjects();
     }
     try {
       const res = await fetch(`${this.baseUrl}/api/projects`, {
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(2000)
+        signal: AbortSignal.timeout(5000)
       });
       if (res.ok) {
+        this.isBackendOnline = true;
         return await res.json();
       }
       if (res.status === 401 || res.status === 403) {
@@ -217,8 +219,9 @@ class AgentApiClient {
       }
     } catch (e) {
       this.isBackendOnline = false;
+      console.warn("Không thể tải danh sách dự án từ máy chủ:", e.message);
     }
-    return this.getUserLocalProjects();
+    return this.isExplicitDemoMode ? this.getUserLocalProjects() : [];
   }
 
   async createProject(projectData) {
@@ -226,25 +229,61 @@ class AgentApiClient {
       throw new Error("Vui lòng đăng nhập trước khi tạo dự án");
     }
 
-    if (!this.isBackendOnline) {
-      return this.saveNewLocalProject(projectData);
-    }
     try {
       const res = await fetch(`${this.baseUrl}/api/projects`, {
         method: "POST",
         headers: this.getHeaders(),
         body: JSON.stringify(projectData),
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(10000)
       });
       if (res.ok) {
+        this.isBackendOnline = true;
         return await res.json();
       }
-      const err = await res.json().catch(() => ({ message: "Không thể tạo dự án" }));
-      throw new Error(err.message || `HTTP ${res.status}`);
+      let errorMsg = "Không thể tạo dự án";
+      try {
+        const err = await res.json();
+        if (err && (err.message || err.error)) errorMsg = err.message || err.error;
+      } catch (_) {}
+      throw new Error(errorMsg);
     } catch (e) {
-      this.isBackendOnline = false;
-      return this.saveNewLocalProject(projectData);
+      if (this.isExplicitDemoMode) {
+        return this.saveNewLocalProject(projectData);
+      }
+      throw e;
     }
+  }
+
+  async deleteProject(projectId) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/projects/${projectId}`, {
+        method: "DELETE",
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(6000)
+      });
+      if (res.ok || res.status === 404) {
+        this.deleteUserLocalProject(projectId);
+        return true;
+      }
+      let errMsg = "Không thể xóa dự án";
+      try {
+        const err = await res.json();
+        if (err && (err.message || err.error)) errMsg = err.message || err.error;
+      } catch (_) {}
+      throw new Error(errMsg);
+    } catch (e) {
+      this.deleteUserLocalProject(projectId);
+      if (e.message && e.message.includes("Không thể xóa")) {
+        throw e;
+      }
+      return true;
+    }
+  }
+
+  deleteUserLocalProject(projectId) {
+    const list = this.getUserLocalProjects();
+    const filtered = list.filter(p => Number(p.id) !== Number(projectId));
+    this.saveUserLocalProjects(filtered);
   }
 
   saveNewLocalProject(projectData) {
@@ -273,7 +312,7 @@ class AgentApiClient {
     try {
       const res = await fetch(`${this.baseUrl}/api/tasks`, {
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(4000)
+        signal: AbortSignal.timeout(5000)
       });
       if (res.ok) {
         this.isBackendOnline = true;
@@ -286,10 +325,11 @@ class AgentApiClient {
       }
       console.warn(`GET /api/tasks returned HTTP ${res.status}`);
     } catch (e) {
+      this.isBackendOnline = false;
       console.warn("Lỗi khi kết nối GET /api/tasks:", e);
     }
 
-    if (!this.isBackendOnline) {
+    if (this.isExplicitDemoMode) {
       return this.getUserLocalTasks();
     }
     return [];
@@ -302,7 +342,7 @@ class AgentApiClient {
     try {
       const res = await fetch(`${this.baseUrl}/api/tasks/${taskId}`, {
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(4000)
+        signal: AbortSignal.timeout(5000)
       });
       if (res.ok) {
         this.isBackendOnline = true;
@@ -320,16 +360,20 @@ class AgentApiClient {
     try {
       const res = await fetch(`${this.baseUrl}/api/tasks/project/${projectId}`, {
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(2000)
+        signal: AbortSignal.timeout(5000)
       });
       if (res.ok) {
+        this.isBackendOnline = true;
         return await res.json();
       }
     } catch (e) {
       // ignore
     }
-    const all = this.getUserLocalTasks();
-    return all.filter(t => t.projectId === Number(projectId));
+    if (this.isExplicitDemoMode) {
+      const all = this.getUserLocalTasks();
+      return all.filter(t => t.projectId === Number(projectId));
+    }
+    return [];
   }
 
   async createTask(taskData) {
@@ -347,16 +391,17 @@ class AgentApiClient {
         method: "POST",
         headers: this.getHeaders(),
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(10000)
       });
       if (res.ok) {
+        this.isBackendOnline = true;
         return await res.json();
       }
       const err = await res.json().catch(() => ({ message: "Không thể tạo task" }));
       throw new Error(err.message || `HTTP ${res.status}`);
     } catch (e) {
-      if (this.isBackendOnline) throw e;
-      // Local fallback
+      if (!this.isExplicitDemoMode) throw e;
+      // Local fallback for explicit demo mode only
       const user = this.getCurrentUser();
       const newTask = {
         id: Date.now(),
@@ -417,7 +462,7 @@ class AgentApiClient {
       const res = await fetch(`${this.baseUrl}/api/tasks/${taskId}/pin`, {
         method: "PATCH",
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(1500)
+        signal: AbortSignal.timeout(3000)
       });
       if (res.ok) {
         return await res.json();
@@ -425,13 +470,14 @@ class AgentApiClient {
     } catch (e) {
       // ignore
     }
-    // Local fallback
-    const tasks = this.getUserLocalTasks();
-    const task = tasks.find(t => t.id === Number(taskId));
-    if (task) {
-      task.isPinned = !task.isPinned;
-      this.saveUserLocalTasks(tasks);
-      return task;
+    if (this.isExplicitDemoMode) {
+      const tasks = this.getUserLocalTasks();
+      const task = tasks.find(t => t.id === Number(taskId));
+      if (task) {
+        task.isPinned = !task.isPinned;
+        this.saveUserLocalTasks(tasks);
+        return task;
+      }
     }
     return null;
   }
@@ -686,6 +732,10 @@ class AgentApiClient {
     return [];
   }
 
+  async getAdminAllTasks(status, userId) {
+    return this.getAllAdminTasks(status, userId);
+  }
+
   async getAdminErrorTasks() {
     try {
       const res = await fetch(`${this.baseUrl}/api/admin/tasks/errors`, {
@@ -710,6 +760,10 @@ class AgentApiClient {
       console.warn("Could not fetch audit logs:", e);
     }
     return [];
+  }
+
+  async getAdminAuditLogs() {
+    return this.getAuditLogs();
   }
 
   // User Actions
@@ -811,7 +865,7 @@ class AgentApiClient {
       });
       if (res.ok) return await res.json();
     } catch (e) {}
-    return { activeModel: "gemini-3.5-flash-lite", allowedModels: ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-2.5-flash"] };
+    return { activeModel: "gemini-3.5-flash-lite", allowedModels: ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash"] };
   }
 
   async getSystemTools() {
@@ -858,13 +912,41 @@ class AgentApiClient {
   }
 
   async deleteChatConversation(convId) {
-    const res = await fetch(`${this.baseUrl}/api/chat/conversations/${convId}`, {
-      method: "DELETE",
+    try {
+      const res = await fetch(`${this.baseUrl}/api/chat/conversations/${convId}`, {
+        method: "DELETE",
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(5000)
+      });
+      if (res.ok || res.status === 404) return true;
+      let errMsg = "Không thể xóa cuộc hội thoại";
+      try {
+        const err = await res.json();
+        if (err && (err.message || err.error)) errMsg = err.message || err.error;
+      } catch (_) {}
+      throw new Error(errMsg);
+    } catch (e) {
+      if (e.message && e.message.includes("Không thể xóa")) {
+        throw e;
+      }
+      return true;
+    }
+  }
+
+  async updateChatConversationModel(convId, model) {
+    const res = await fetch(`${this.baseUrl}/api/chat/conversations/${convId}/model`, {
+      method: "PATCH",
       headers: this.getHeaders(),
-      signal: AbortSignal.timeout(5000)
+      body: JSON.stringify({ model }),
+      signal: AbortSignal.timeout(4000)
     });
     if (res.ok) return await res.json();
-    throw new Error("Không thể xóa cuộc hội thoại");
+    let errMsg = "Không thể cập nhật mô hình cho cuộc hội thoại";
+    try {
+      const err = await res.json();
+      if (err && err.message) errMsg = err.message;
+    } catch (_) {}
+    throw new Error(errMsg);
   }
 
   async sendChatMessage(message, conversationId, model, projectId) {

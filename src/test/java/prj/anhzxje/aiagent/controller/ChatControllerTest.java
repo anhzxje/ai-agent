@@ -8,10 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import prj.anhzxje.aiagent.dto.chat.ChatConversationDetailResponse;
-import prj.anhzxje.aiagent.dto.chat.ChatConversationResponse;
-import prj.anhzxje.aiagent.dto.chat.ChatMessageRequest;
-import prj.anhzxje.aiagent.dto.chat.ChatMessageResponse;
+import prj.anhzxje.aiagent.dto.chat.*;
 import prj.anhzxje.aiagent.entity.User;
 import prj.anhzxje.aiagent.enums.Role;
 import prj.anhzxje.aiagent.security.CustomUserDetails;
@@ -72,18 +69,38 @@ class ChatControllerTest {
                 .build();
         when(chatService.createConversation(currentUser, "Project Chat", "gemini-3.5-flash-lite", 10L)).thenReturn(c);
 
-        Map<String, Object> body = Map.of(
-                "title", "Project Chat",
-                "model", "gemini-3.5-flash-lite",
-                "projectId", 10L
-        );
+        CreateConversationRequest request = CreateConversationRequest.builder()
+                .title("Project Chat")
+                .model("gemini-3.5-flash-lite")
+                .projectId(10L)
+                .build();
 
-        ResponseEntity<ChatConversationResponse> response = chatController.createConversation(body, userDetails);
+        ResponseEntity<ChatConversationResponse> response = chatController.createConversation(request, userDetails);
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(2L, response.getBody().getId());
         assertEquals(10L, response.getBody().getProjectId());
+    }
+
+    @Test
+    void testUpdateConversationModel() {
+        ChatConversationResponse c = ChatConversationResponse.builder()
+                .id(1L)
+                .title("Chat")
+                .model("gemini-1.5-pro")
+                .build();
+        when(chatService.updateConversationModel(1L, "gemini-1.5-pro", currentUser)).thenReturn(c);
+
+        UpdateChatModelRequest request = UpdateChatModelRequest.builder()
+                .model("gemini-1.5-pro")
+                .build();
+
+        ResponseEntity<ChatConversationResponse> response = chatController.updateConversationModel(1L, request, userDetails);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("gemini-1.5-pro", response.getBody().getModel());
     }
 
     @Test

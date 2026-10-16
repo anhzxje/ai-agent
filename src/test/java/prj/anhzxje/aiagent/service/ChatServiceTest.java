@@ -97,6 +97,9 @@ class ChatServiceTest {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
+
+        org.mockito.Mockito.lenient().when(systemConfigService.getAllowedModels()).thenReturn(List.of("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash"));
+        org.mockito.Mockito.lenient().when(systemConfigService.getActiveModel()).thenReturn("gemini-3.5-flash-lite");
     }
 
     @Test
@@ -235,7 +238,7 @@ class ChatServiceTest {
             return m;
         });
 
-        when(toolManagerService.resolveActiveTools(null)).thenReturn(List.of("mockToolInstance"));
+        when(toolManagerService.resolveActiveTools(any(), any())).thenReturn(List.of("mockToolInstance"));
 
         ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class, Answers.RETURNS_DEEP_STUBS);
         when(chatClientBuilder.build()).thenReturn(chatClient);
@@ -256,7 +259,7 @@ class ChatServiceTest {
 
         assertNotNull(response);
         assertEquals("Dự án Soopi Core có cấu trúc rất tốt.", response.getContent());
-        verify(toolManagerService, times(1)).resolveActiveTools(null);
+        verify(toolManagerService, times(1)).resolveActiveTools(eq(null), eq("/path/to/soopi"));
         verify(requestSpec, times(1)).tools(any(Object[].class));
     }
 }

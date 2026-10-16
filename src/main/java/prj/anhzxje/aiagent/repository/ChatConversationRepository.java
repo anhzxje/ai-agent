@@ -24,4 +24,13 @@ public interface ChatConversationRepository extends JpaRepository<ChatConversati
 
     /** Xóa toàn bộ cuộc hội thoại của một người dùng cụ thể */
     void deleteByUserId(Long userId);
+
+    /** Lấy danh sách cuộc hội thoại thuộc về một dự án cụ thể */
+    List<ChatConversation> findByProjectId(Long projectId);
+
+    /** Lấy danh sách cuộc hội thoại của user thuộc 1 dự án cụ thể, sắp xếp theo lần cập nhật gần nhất */
+    List<ChatConversation> findByUserIdAndProjectIdOrderByUpdatedAtDesc(Long userId, Long projectId);
+
+    /** Xóa toàn bộ cuộc hội thoại liên quan đến một dự án cụ thể */
+    void deleteByProjectId(Long projectId);
 }

@@ -22,11 +22,13 @@ import prj.anhzxje.aiagent.repository.ChatConversationRepository;
 import prj.anhzxje.aiagent.repository.ChatMessageRepository;
 import prj.anhzxje.aiagent.repository.ProjectRepository;
 import prj.anhzxje.aiagent.repository.UserPreferencesRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import prj.anhzxje.aiagent.repository.UserRepository;
 import prj.anhzxje.aiagent.security.CustomUserDetails;
 import prj.anhzxje.aiagent.service.AuditLogService;
 import prj.anhzxje.aiagent.service.SystemConfigService;
 import prj.anhzxje.aiagent.service.ToolManagerService;
+import prj.anhzxje.aiagent.service.UserService;
 
 import java.util.List;
 import java.util.Map;
@@ -47,7 +49,6 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/api/admin")
-@RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
@@ -60,6 +61,50 @@ public class AdminController {
     private final AuditLogService auditLogService;
     private final ToolManagerService toolManagerService;
     private final SystemConfigService systemConfigService;
+    private final UserService userService;
+
+    @Autowired
+    public AdminController(UserRepository userRepository,
+                           ProjectRepository projectRepository,
+                           AgentTaskRepository agentTaskRepository,
+                           ChatConversationRepository chatConversationRepository,
+                           ChatMessageRepository chatMessageRepository,
+                           UserPreferencesRepository userPreferencesRepository,
+                           AuditLogService auditLogService,
+                           ToolManagerService toolManagerService,
+                           SystemConfigService systemConfigService,
+                           UserService userService) {
+        this.userRepository = userRepository;
+        this.projectRepository = projectRepository;
+        this.agentTaskRepository = agentTaskRepository;
+        this.chatConversationRepository = chatConversationRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.userPreferencesRepository = userPreferencesRepository;
+        this.auditLogService = auditLogService;
+        this.toolManagerService = toolManagerService;
+        this.systemConfigService = systemConfigService;
+        this.userService = userService != null ? userService : new UserService(
+                userRepository, null, null, auditLogService,
+                projectRepository, agentTaskRepository, chatConversationRepository,
+                chatMessageRepository, userPreferencesRepository);
+    }
+
+    public AdminController(UserRepository userRepository,
+                           ProjectRepository projectRepository,
+                           AgentTaskRepository agentTaskRepository,
+                           ChatConversationRepository chatConversationRepository,
+                           ChatMessageRepository chatMessageRepository,
+                           UserPreferencesRepository userPreferencesRepository,
+                           AuditLogService auditLogService,
+                           ToolManagerService toolManagerService,
+                           SystemConfigService systemConfigService) {
+        this(userRepository, projectRepository, agentTaskRepository, chatConversationRepository,
+                chatMessageRepository, userPreferencesRepository, auditLogService, toolManagerService,
+                systemConfigService, new UserService(
+                        userRepository, null, null, auditLogService,
+                        projectRepository, agentTaskRepository, chatConversationRepository,
+                        chatMessageRepository, userPreferencesRepository));
+    }
 
     /**
      * Lấy dữ liệu thống kê tổng quan toàn hệ thống cho Dashboard Admin.
@@ -111,19 +156,7 @@ public class AdminController {
      */
     @GetMapping("/users")
     public ResponseEntity<List<UserSummaryResponse>> getAllUsers() {
-        List<UserSummaryResponse> users = userRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(u -> UserSummaryResponse.builder()
-                        .id(u.getId())
-                        .username(u.getUsername())
-                        .email(u.getEmail())
-                        .role(u.getRole())
-                        .isLocked(Boolean.TRUE.equals(u.getIsLocked()))
-                        .createdAt(u.getCreatedAt())
-                        .projectCount(projectRepository.countByUserId(u.getId()))
-                        .taskCount(agentTaskRepository.countByUserId(u.getId()))
-                        .build())
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(userService.getAllUsersSummary());
     }
 
     /**
@@ -137,23 +170,7 @@ public class AdminController {
             @PathVariable Long userId,
             @RequestParam boolean locked,
             @AuthenticationPrincipal CustomUserDetails adminUser) {
-        User target = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản với id: " + userId));
-
-        // Ràng buộc bảo mật: Quản trị viên không được phép tự khóa chính mình
-        if (adminUser != null && adminUser.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("Không thể tự khóa tài khoản quản trị của chính mình");
-        }
-
-        target.setIsLocked(locked);
-        User saved = userRepository.save(target);
-
-        // Ghi nhật ký kiểm toán hành vi quản trị
-        String action = locked ? "LOCK_USER" : "UNLOCK_USER";
-        auditLogService.log(adminUser != null ? adminUser.getUsername() : "ADMIN", action,
-                (locked ? "Đã khóa" : "Đã mở khóa") + " tài khoản: " + target.getUsername() + " (id=" + userId + ")");
-
-        return ResponseEntity.ok(toUserSummaryResponse(saved));
+        return ResponseEntity.ok(userService.updateUserStatus(userId, locked, adminUser));
     }
 
     /**
@@ -163,11 +180,7 @@ public class AdminController {
     public ResponseEntity<UserSummaryResponse> toggleUserLock(
             @PathVariable Long userId,
             @AuthenticationPrincipal CustomUserDetails adminUser) {
-        User target = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản với id: " + userId));
-
-        boolean newLockedState = !Boolean.TRUE.equals(target.getIsLocked());
-        return updateUserStatus(userId, newLockedState, adminUser);
+        return ResponseEntity.ok(userService.toggleUserLock(userId, adminUser));
     }
 
     /**
@@ -179,22 +192,7 @@ public class AdminController {
             @PathVariable Long userId,
             @RequestParam Role role,
             @AuthenticationPrincipal CustomUserDetails adminUser) {
-        User target = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản với id: " + userId));
-
-        // Ràng buộc bảo vệ: Không cho phép Admin tự giáng quyền của chính mình thành USER
-        if (adminUser != null && adminUser.getUser().getId().equals(userId) && role != Role.ADMIN) {
-            throw new IllegalArgumentException("Không thể tự hạ quyền của chính tài khoản quản trị hiện tại");
-        }
-
-        Role oldRole = target.getRole();
-        target.setRole(role);
-        User saved = userRepository.save(target);
-
-        auditLogService.log(adminUser != null ? adminUser.getUsername() : "ADMIN", "UPDATE_ROLE",
-                "Đổi vai trò người dùng " + target.getUsername() + " từ " + oldRole + " sang " + role);
-
-        return ResponseEntity.ok(toUserSummaryResponse(saved));
+        return ResponseEntity.ok(userService.updateUserRole(userId, role, adminUser));
     }
 
     /**
@@ -209,51 +207,7 @@ public class AdminController {
     public ResponseEntity<?> deleteUser(
             @PathVariable Long userId,
             @AuthenticationPrincipal CustomUserDetails adminUser) {
-        User target = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản với id: " + userId));
-
-        // Ràng buộc bảo vệ: Admin không thể xóa chính tài khoản mình đang đăng nhập
-        if (adminUser != null && adminUser.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("Không thể xóa chính tài khoản quản trị viên hiện tại");
-        }
-
-        // Bước 1: Xóa các tác vụ AI liên quan trước để tránh lỗi khóa ngoại (Foreign Key Constraint)
-        List<AgentTask> userTasks = agentTaskRepository.findByUserId(userId);
-        if (!userTasks.isEmpty()) {
-            agentTaskRepository.deleteAll(userTasks);
-        }
-
-        // Bước 2: Xóa toàn bộ tin nhắn và các cuộc hội thoại chat của user
-        List<ChatConversation> userConvs = chatConversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
-        for (ChatConversation conv : userConvs) {
-            chatMessageRepository.deleteByConversationId(conv.getId());
-        }
-        if (!userConvs.isEmpty()) {
-            chatConversationRepository.deleteAll(userConvs);
-        }
-
-        // Bước 3: Xóa tùy chọn cá nhân của user
-        userPreferencesRepository.deleteByUserId(userId);
-
-        // Bước 4: Xóa các dự án mã nguồn liên quan (và task con nếu có)
-        List<Project> userProjects = projectRepository.findByUserId(userId);
-        for (Project p : userProjects) {
-            agentTaskRepository.deleteByProjectId(p.getId());
-        }
-        if (!userProjects.isEmpty()) {
-            projectRepository.deleteAll(userProjects);
-        }
-
-        // Bước 5: Xóa bản ghi người dùng
-        userRepository.delete(target);
-
-        // Bước 6: Ghi nhật ký kiểm toán hành vi xóa tài khoản
-        auditLogService.log(adminUser != null ? adminUser.getUsername() : "ADMIN", "DELETE_USER",
-                "Đã xóa tài khoản người dùng " + target.getUsername() + " và toàn bộ dữ liệu liên quan");
-
-        return ResponseEntity.ok(Map.of(
-                "message", "Đã xóa tài khoản " + target.getUsername() + " thành công"
-        ));
+        return ResponseEntity.ok(userService.deleteUserCascade(userId, adminUser));
     }
 
     // ────────────────────────────────────────────────
@@ -347,15 +301,22 @@ public class AdminController {
     @GetMapping("/tasks")
     public ResponseEntity<List<AdminTaskResponse>> getAllTasks(
             @RequestParam(required = false) JobStatus status,
-            @RequestParam(required = false) Long userId) {
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+
+        int pageNum = (page != null && page >= 0) ? page : 0;
+        int pageSize = (size != null && size > 0 && size <= 200) ? size : (page != null ? 50 : 100);
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                pageNum, pageSize, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
 
         List<AgentTask> tasks;
         if (userId != null) {
-            tasks = agentTaskRepository.findByUserIdOrderByCreatedAtDesc(userId);
+            tasks = agentTaskRepository.findByUserId(userId, pageable).getContent();
         } else if (status != null) {
-            tasks = agentTaskRepository.findByStatusOrderByCreatedAtDesc(status);
+            tasks = agentTaskRepository.findByStatus(status, pageable).getContent();
         } else {
-            tasks = agentTaskRepository.findAllByOrderByCreatedAtDesc();
+            tasks = agentTaskRepository.findAll(pageable).getContent();
         }
 
         List<AdminTaskResponse> res = tasks.stream()

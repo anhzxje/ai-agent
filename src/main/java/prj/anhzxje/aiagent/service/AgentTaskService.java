@@ -7,12 +7,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import prj.anhzxje.aiagent.dto.task.AgentTaskRequest;
 import prj.anhzxje.aiagent.dto.task.AgentTaskResponse;
 import prj.anhzxje.aiagent.entity.AgentTask;
 import prj.anhzxje.aiagent.entity.Project;
 import prj.anhzxje.aiagent.entity.User;
 import prj.anhzxje.aiagent.enums.JobStatus;
+import prj.anhzxje.aiagent.enums.TaskType;
 import prj.anhzxje.aiagent.exception.ResourceNotFoundException;
 import prj.anhzxje.aiagent.repository.AgentTaskRepository;
 import prj.anhzxje.aiagent.repository.ProjectRepository;
@@ -143,7 +146,22 @@ public class AgentTaskService {
         }
 
         // Bước 7: Kích hoạt Agent xử lý ngầm (True Async via AgentTaskExecutor Spring Bean)
-        agentTaskExecutor.executeTaskAsync(saved.getId(), project.getPath(), finalInput, request.getType());
+        // Chống race condition: Đảm bảo transaction đã commit xuống CSDL trước khi thread ngầm truy vấn findById
+        final String effectiveInput = saved.getInput();
+        final TaskType effectiveType = saved.getType();
+        final String effectiveProjectPath = project.getPath();
+        final Long effectiveTaskId = saved.getId();
+
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    agentTaskExecutor.executeTaskAsync(effectiveTaskId, effectiveProjectPath, effectiveInput, effectiveType);
+                }
+            });
+        } else {
+            agentTaskExecutor.executeTaskAsync(effectiveTaskId, effectiveProjectPath, effectiveInput, effectiveType);
+        }
 
         // Bước 8: Chuyển đổi sang Response DTO và trả về ngay lập tức cho Client
         return toResponse(saved);
@@ -220,7 +238,16 @@ public class AgentTaskService {
         if (auditLogService != null) {
             auditLogService.log(getCurrentUser().getUsername(), "RETRY_TASK", "Thực thi lại tác vụ #" + taskId);
         }
-        agentTaskExecutor.executeTaskAsync(saved.getId(), saved.getProject().getPath(), saved.getInput(), saved.getType());
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    agentTaskExecutor.executeTaskAsync(saved.getId(), saved.getProject().getPath(), saved.getInput(), saved.getType());
+                }
+            });
+        } else {
+            agentTaskExecutor.executeTaskAsync(saved.getId(), saved.getProject().getPath(), saved.getInput(), saved.getType());
+        }
         return toResponse(saved);
     }
 

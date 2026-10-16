@@ -25,6 +25,7 @@ import java.util.List;
 public class CodeReviewAgent {
 
     private final ChatClient chatClient;
+    private final ChatClient.Builder chatClientBuilder;
 
     /**
      * Safety settings cho Gemini — hạ threshold để model không từ chối
@@ -77,6 +78,7 @@ public class CodeReviewAgent {
     public CodeReviewAgent(ChatClient.Builder chatClientBuilder,
                            @org.springframework.lang.Nullable ToolManagerService toolManagerService,
                            @org.springframework.lang.Nullable SystemConfigService systemConfigService) {
+        this.chatClientBuilder = chatClientBuilder;
         this.toolManagerService = toolManagerService;
         this.systemConfigService = systemConfigService;
 
@@ -206,15 +208,23 @@ public class CodeReviewAgent {
                 If no significant issues are found, return an empty issues array.
                 """.formatted(projectPath, focusInstruction);
 
-        var promptSpec = chatClient.prompt().user(prompt);
+        ChatClient activeChatClient = this.chatClient;
+        if (systemConfigService != null && systemConfigService.hasCustomApiKey()) {
+            activeChatClient = systemConfigService.getChatClientBuilder(chatClientBuilder)
+                    .defaultSystem(loadSystemPrompt())
+                    .build();
+        }
+
+        var promptSpec = activeChatClient.prompt().user(prompt);
 
         // ====================================================================
         // BƯỚC 3: PHÂN GIẢI VÀ GẮN CÔNG CỤ THỰC TẾ (DYNAMIC TOOL CALLING)
         // Lấy danh sách công cụ đang được kích hoạt bởi Admin và giao thoa với
         // danh sách công cụ mà người dùng cấp phép khi tạo tác vụ.
+        // Ràng buộc sandbox theo projectPath.
         // ====================================================================
         if (toolManagerService != null) {
-            List<Object> dynamicTools = toolManagerService.resolveActiveTools(requestedTools);
+            List<Object> dynamicTools = toolManagerService.resolveActiveTools(requestedTools, projectPath);
             if (!dynamicTools.isEmpty()) {
                 promptSpec.tools(dynamicTools.toArray());
             }
@@ -234,6 +244,16 @@ public class CodeReviewAgent {
             effectiveModel = "gemini-3.5-flash-lite";
         }
 
+        // Auto-fallback: chuyển sang active model nếu model được chọn đã bị Google ngừng hỗ trợ
+        if (systemConfigService != null) {
+            List<String> allowed = systemConfigService.getAllowedModels();
+            if (!allowed.contains(effectiveModel)) {
+                String fallback = systemConfigService.getActiveModel();
+                log.warn("Model '{}' không còn được hỗ trợ, chuyển sang '{}'", effectiveModel, fallback);
+                effectiveModel = fallback;
+            }
+        }
+
         // Gắn cấu hình an toàn (Safety Settings) và tên Model vào Options của cuộc gọi
         promptSpec.options(GoogleGenAiChatOptions.builder()
                 .safetySettings(safetySettings)
@@ -248,10 +268,14 @@ public class CodeReviewAgent {
         try {
             result = promptSpec.call().content();
         } catch (Exception e) {
-            String err = e.getMessage() != null ? e.getMessage() : "";
+            Throwable root = e;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            String err = root.getMessage() != null ? root.getMessage() : (e.getMessage() != null ? e.getMessage() : "");
             log.error("Lỗi khi gọi Gemini với model {}: {}", effectiveModel, err, e);
             if (err.contains("429") || err.contains("RESOURCE_EXHAUSTED") || err.contains("Quota exceeded") || err.contains("limit")) {
-                throw new RuntimeException("Mô hình " + effectiveModel + " đã đạt giới hạn hạn mức (Rate limit/Quota). Vui lòng đổi sang mô hình khác (khuyên dùng: gemini-3.1-flash-lite hoặc gemini-2.5-flash-lite). Chi tiết: " + err, e);
+                throw new RuntimeException("Mô hình " + effectiveModel + " đã đạt giới hạn hạn mức (Rate limit/Quota). Vui lòng đổi sang mô hình khác hoặc thử lại sau vài giây. Chi tiết: " + err, e);
             }
             throw new RuntimeException("Lỗi từ Gemini AI (" + effectiveModel + "): " + err, e);
         }

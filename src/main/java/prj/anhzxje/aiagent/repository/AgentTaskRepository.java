@@ -97,6 +97,23 @@ public interface AgentTaskRepository extends JpaRepository<AgentTask, Long> {
      */
     long countByUserId(Long userId);
 
+    /** Đếm tổng số lượng tác vụ gom nhóm theo user_id để giải quyết N+1 query */
+    @org.springframework.data.jpa.repository.Query("SELECT t.user.id, COUNT(t) FROM AgentTask t GROUP BY t.user.id")
+    List<Object[]> countTasksGroupedByUser();
+
+    /** Phân trang tác vụ theo người dùng kèm nạp trước project và user */
+    @EntityGraph(attributePaths = {"project", "user"})
+    org.springframework.data.domain.Page<AgentTask> findByUserId(Long userId, org.springframework.data.domain.Pageable pageable);
+
+    /** Phân trang tác vụ theo trạng thái kèm nạp trước project và user */
+    @EntityGraph(attributePaths = {"project", "user"})
+    org.springframework.data.domain.Page<AgentTask> findByStatus(prj.anhzxje.aiagent.enums.JobStatus status, org.springframework.data.domain.Pageable pageable);
+
+    /** Phân trang toàn bộ tác vụ kèm nạp trước project và user */
+    @Override
+    @EntityGraph(attributePaths = {"project", "user"})
+    org.springframework.data.domain.Page<AgentTask> findAll(org.springframework.data.domain.Pageable pageable);
+
     /** Đếm số lượng tác vụ theo trạng thái */
     long countByStatus(prj.anhzxje.aiagent.enums.JobStatus status);
 

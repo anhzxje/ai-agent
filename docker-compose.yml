@@ -8,7 +8,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
-      MYSQL_DATABASE: aiagent_db
+      MYSQL_DATABASE: ai_agent
     ports:
       - "3306:3306"
     volumes:
@@ -29,7 +29,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/aiagent_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ai_agent?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-root}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-root}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-YOUR_GEMINI_API_KEY}
