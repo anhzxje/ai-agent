@@ -32,6 +32,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Make Maven Wrapper executable
+        run: chmod +x mvnw
+
       - name: Run Java tests and package application
         run: ./mvnw --batch-mode --no-transfer-progress verify
 
