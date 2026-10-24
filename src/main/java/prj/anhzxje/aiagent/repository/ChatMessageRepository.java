@@ -15,6 +15,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     /** Lấy toàn bộ các tin nhắn trong một cuộc hội thoại theo thứ tự thời gian tăng dần */
     List<ChatMessage> findByConversationIdOrderByCreatedAtAsc(Long conversationId);
 
+    List<ChatMessage> findTop10ByConversationIdOrderByCreatedAtDescIdDesc(Long conversationId);
+
     /** Xóa toàn bộ tin nhắn thuộc một cuộc hội thoại khi phiên bị xóa */
     void deleteByConversationId(Long conversationId);
 }

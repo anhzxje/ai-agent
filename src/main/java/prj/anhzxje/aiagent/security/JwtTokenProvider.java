@@ -93,6 +93,8 @@ public class JwtTokenProvider {
             log.error("JWT token đã hết hạn: {}", e.getMessage());
         } catch (UnsupportedJwtException e) {
             log.error("JWT token không được hỗ trợ: {}", e.getMessage());
+        } catch (JwtException e) {
+            log.warn("JWT signature or claims invalid");
         } catch (IllegalArgumentException e) {
             log.error("JWT claims string rỗng hoặc null: {}", e.getMessage());
         }

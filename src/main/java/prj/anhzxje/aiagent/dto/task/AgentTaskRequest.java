@@ -1,17 +1,14 @@
 package prj.anhzxje.aiagent.dto.task;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import prj.anhzxje.aiagent.enums.TaskType;
 
-import java.io.IOException;
 
 /**
  * Đối tượng DTO yêu cầu khởi tạo Tác vụ AI (Agent Task Request):
@@ -38,7 +35,6 @@ public class AgentTaskRequest {
      * Input dạng JSON string hoặc JSON Object — cấu trúc tùy vào TaskType.
      * Hỗ trợ nhận cả chuỗi String lẫn Object JSON trực tiếp từ frontend/desktop client.
      */
-    @JsonDeserialize(using = FlexibleStringDeserializer.class)
     private String input;
 
     /**
@@ -56,31 +52,21 @@ public class AgentTaskRequest {
      */
     private String prompt;
 
-    /**
-     * Bộ giải tuần tự hóa tùy biến (Custom JSON Deserializer):
-     * Linh hoạt xử lý trường `input` khi client gửi lên dưới dạng chuỗi String thuần túy
-     * HOẶC một đối tượng JSON Object lồng nhau, giúp tránh lỗi parse từ frontend/desktop.
-     */
-    public static class FlexibleStringDeserializer extends JsonDeserializer<String> {
+    private static final ObjectMapper INPUT_MAPPER = new ObjectMapper();
 
-        /**
-         * Chuyển đổi dữ liệu JSON đầu vào thành chuỗi String.
-         *
-         * @param p    bộ parser JSON của Jackson
-         * @param ctxt ngữ cảnh giải tuần tự hóa
-         * @return chuỗi String biểu diễn JSON hoặc null nếu rỗng
-         * @throws IOException nếu xảy ra lỗi đọc luồng JSON
-         */
-        @Override
-        public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-            JsonNode node = p.getCodec().readTree(p);
-            if (node == null || node.isNull()) {
-                return null;
+    /** Shared annotations work with both Jackson 2 and Boot 4's Jackson 3 HTTP converter. */
+    @JsonSetter("input")
+    public void setInput(Object value) {
+        if (value == null || value instanceof String) {
+            this.input = (String) value;
+        } else if (value instanceof java.util.Map<?, ?>) {
+            try {
+                this.input = INPUT_MAPPER.writeValueAsString(value);
+            } catch (JsonProcessingException e) {
+                throw new IllegalArgumentException("Input không thể chuyển thành JSON", e);
             }
-            if (node.isTextual()) {
-                return node.asText();
-            }
-            return node.toString();
+        } else {
+            throw new IllegalArgumentException("Input phải là đối tượng hoặc chuỗi JSON");
         }
     }
 }

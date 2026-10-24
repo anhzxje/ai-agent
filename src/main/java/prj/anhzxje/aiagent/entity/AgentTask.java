@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
  * - isPinned: Ghim tác vụ quan trọng lên thanh điều hướng bên trái
  */
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "agent_tasks")
 @Getter
 @Setter
@@ -60,6 +61,10 @@ public class AgentTask {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private JobStatus status = JobStatus.PENDING;
+
+    /** Identifies the worker that owns the current attempt; stale workers cannot finish a retry. */
+    @Column(length = 36)
+    private String executionId;
 
     /**
      * Input dạng JSON — linh hoạt cho mọi loại task.

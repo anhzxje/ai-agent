@@ -12,6 +12,7 @@
  * ============================================================================
  */
 (function() {
+  const escapeHtml = window.MarkdownUtils.escapeHtml;
   let savedEl = null;
   let savedState = null;
   let savedApiClient = null;
@@ -89,11 +90,11 @@
               <tr>
                 <td style="font-family: var(--font-mono); font-weight: 600;">#${u.id}</td>
                 <td>
-                  <strong>${u.username}</strong>
+                  <strong>${escapeHtml(u.username)}</strong>
                   ${isSelf ? '<span style="font-size: 10px; margin-left: 4px; opacity: 0.6;">(Bạn)</span>' : ''}
                 </td>
-                <td style="color: var(--text-secondary);">${u.email || '-'}</td>
-                <td><span class="${roleClass}">${u.role}</span></td>
+                <td style="color: var(--text-secondary);">${escapeHtml(u.email || '-')}</td>
+                <td><span class="${roleClass}">${escapeHtml(u.role)}</span></td>
                 <td>${lockStatusHtml}</td>
                 <td>
                   <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--text-secondary);">
@@ -102,17 +103,17 @@
                 </td>
                 <td style="color: var(--text-muted); font-size: 11.5px;">${dateStr}</td>
                 <td style="text-align: right; white-space: nowrap;">
-                  <button type="button" class="btn-table-action primary" data-action="inspect-user" data-user-id="${u.id}" data-username="${u.username}" data-email="${u.email || ''}" data-role="${u.role}" title="Thanh tra nhật ký chat & tác vụ của tài khoản này">
+                  <button type="button" class="btn-table-action primary" data-action="inspect-user" data-user-id="${u.id}" data-username="${escapeHtml(u.username)}" data-email="${escapeHtml(u.email || '')}" data-role="${escapeHtml(u.role)}" title="Thanh tra nhật ký chat & tác vụ của tài khoản này">
                     Kiểm duyệt
                   </button>
                   ${isSelf ? '' : `
-                    <button type="button" class="btn-table-action" data-action="toggle-lock" data-user-id="${u.id}" data-username="${u.username}" data-locked="${u.isLocked}" title="${u.isLocked ? 'Mở khóa' : 'Khóa'} tài khoản">
+                    <button type="button" class="btn-table-action" data-action="toggle-lock" data-user-id="${u.id}" data-username="${escapeHtml(u.username)}" data-locked="${u.isLocked}" title="${u.isLocked ? 'Mở khóa' : 'Khóa'} tài khoản">
                       ${u.isLocked ? 'Mở khóa' : 'Khóa'}
                     </button>
-                    <button type="button" class="btn-table-action" data-action="toggle-role" data-user-id="${u.id}" data-username="${u.username}" data-role="${u.role}" title="Chuyển quyền sang ${u.role === 'ADMIN' ? 'USER' : 'ADMIN'}">
+                    <button type="button" class="btn-table-action" data-action="toggle-role" data-user-id="${u.id}" data-username="${escapeHtml(u.username)}" data-role="${escapeHtml(u.role)}" title="Chuyển quyền sang ${u.role === 'ADMIN' ? 'USER' : 'ADMIN'}">
                       ${u.role === 'ADMIN' ? 'Giáng USER' : 'Nâng ADMIN'}
                     </button>
-                    <button type="button" class="btn-table-action danger" data-action="delete-user" data-user-id="${u.id}" data-username="${u.username}" title="Xóa tài khoản vĩnh viễn">
+                    <button type="button" class="btn-table-action danger" data-action="delete-user" data-user-id="${u.id}" data-username="${escapeHtml(u.username)}" title="Xóa tài khoản vĩnh viễn">
                       Xóa
                     </button>
                   `}
@@ -192,7 +193,7 @@
     } catch (e) {
       console.error("Lỗi khi tải dữ liệu quản trị:", e);
       if (el.adminUsersTableBody) {
-        el.adminUsersTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi kết nối máy chủ quản trị: ${e.message}</td></tr>`;
+        el.adminUsersTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi kết nối máy chủ quản trị: ${escapeHtml(e.message)}</td></tr>`;
       }
     }
   }
@@ -254,14 +255,14 @@
               <div class="inspect-item-card">
                 <div class="inspect-item-header">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="task-type-pill" style="font-size: 10px;">${t.type || 'TASK'}</span>
-                    <strong style="font-size: 13px;">${t.projectName || 'Dự án'}</strong>
+                    <span class="task-type-pill" style="font-size: 10px;">${escapeHtml(t.type || 'TASK')}</span>
+                    <strong style="font-size: 13px;">${escapeHtml(t.projectName || 'Dự án')}</strong>
                     <span style="font-size: 11px; opacity: 0.6; font-family: var(--font-mono);">#${t.id}</span>
                   </div>
-                  <span class="severity-tag ${t.status === 'COMPLETED' ? 'LOW' : 'HIGH'}" style="font-size: 10px;">${t.status}</span>
+                  <span class="severity-tag ${t.status === 'COMPLETED' ? 'LOW' : 'HIGH'}" style="font-size: 10px;">${escapeHtml(t.status)}</span>
                 </div>
                 <div class="inspect-item-body">
-                  ${summaryText}
+                  ${escapeHtml(summaryText)}
                 </div>
                 <div class="inspect-item-footer">
                   <span>${dateStr}</span>
@@ -287,13 +288,13 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                     </svg>
-                    <strong style="font-size: 13.5px;">${p.name}</strong>
+                    <strong style="font-size: 13.5px;">${escapeHtml(p.name)}</strong>
                     <span style="font-size: 11px; opacity: 0.6; font-family: var(--font-mono);">#${p.id}</span>
                   </div>
-                  <span class="badge-role-user" style="font-size: 10px;">${p.language || 'Code'}</span>
+                  <span class="badge-role-user" style="font-size: 10px;">${escapeHtml(p.language || 'Code')}</span>
                 </div>
                 <div class="inspect-item-body" style="font-family: var(--font-mono); font-size: 11.5px; opacity: 0.85;">
-                  ${p.path || 'Chưa có đường dẫn'}
+                  ${escapeHtml(p.path || 'Chưa có đường dẫn')}
                 </div>
                 <div class="inspect-item-footer">
                   <span>Tạo ngày: ${dateStr}</span>
@@ -306,7 +307,7 @@
     } catch (err) {
       console.error("Lỗi tải thông tin kiểm duyệt:", err);
       if (el.inspectTasksContainer) {
-        el.inspectTasksContainer.innerHTML = `<div style="color: var(--diff-del); padding: 20px; text-align: center;">Lỗi tải dữ liệu: ${err.message}</div>`;
+        el.inspectTasksContainer.innerHTML = `<div style="color: var(--diff-del); padding: 20px; text-align: center;">Lỗi tải dữ liệu: ${escapeHtml(err.message)}</div>`;
       }
     }
   }
@@ -408,7 +409,7 @@
         const model = modelInput ? modelInput.value.trim() : "";
         if (!model) return;
         try {
-          if (client) await client.updateAdminModel(model);
+          if (client) await client.updateAdminSettings({ model });
           alert(`Đã lưu mô hình hoạt động: ${model}`);
         } catch (err) {
           alert(`Lỗi cập nhật model: ${err.message}`);
@@ -425,7 +426,7 @@
         if (!key) return;
         try {
           if (client) {
-            await client.updateAdminGeminiKey(key);
+            await client.updateAdminSettings({ apiKey: key });
             alert("Đã cập nhật Gemini API Key thành công!");
             if (keyInput) keyInput.value = "";
             await loadAdminSettings(client);
@@ -450,11 +451,11 @@
       container.innerHTML = tools.map(t => `
         <div class="tool-switch-card">
           <div class="tool-switch-info">
-            <div class="tool-switch-name">${t.displayName || t.toolName} <code>(${t.toolName})</code></div>
-            <div class="tool-switch-desc">${t.description || 'Công cụ hệ thống cho phép Agent tự động gọi'}</div>
+            <div class="tool-switch-name">${escapeHtml(t.displayName || t.toolName)} <code>(${escapeHtml(t.toolName)})</code></div>
+            <div class="tool-switch-desc">${escapeHtml(t.description || 'Công cụ hệ thống cho phép Agent tự động gọi')}</div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" data-tool-name="${t.toolName}" ${t.enabled ? 'checked' : ''}>
+            <input type="checkbox" data-tool-name="${escapeHtml(t.toolName)}" ${t.enabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -464,7 +465,7 @@
         input.onchange = async () => {
           const name = input.getAttribute("data-tool-name");
           try {
-            await apiClient.toggleAdminTool(name);
+            await apiClient.updateToolStatus(name, input.checked);
           } catch (err) {
             alert(`Lỗi thay đổi trạng thái công cụ: ${err.message}`);
             input.checked = !input.checked;
@@ -472,7 +473,7 @@
         };
       });
     } catch (err) {
-      container.innerHTML = `<div style="color: var(--diff-del); padding: 16px;">Lỗi tải công cụ: ${err.message}</div>`;
+      container.innerHTML = `<div style="color: var(--diff-del); padding: 16px;">Lỗi tải công cụ: ${escapeHtml(err.message)}</div>`;
     }
   }
 
@@ -482,8 +483,8 @@
     try {
       const settings = await apiClient.getAdminSettings();
       if (settings) {
-        if (inputModel) inputModel.value = settings.model || "gemini-3.5-flash-lite";
-        if (hint) hint.textContent = `Trạng thái Key hiện tại: ${settings.geminiApiKeyMasked || 'Chưa thiết lập'}`;
+        if (inputModel) inputModel.value = settings.activeModel || "gemini-3.5-flash-lite";
+        if (hint) hint.textContent = `Trạng thái Key hiện tại: ${settings.maskedApiKey || 'Chưa thiết lập'}`;
       }
     } catch (err) {
       console.warn("Could not load admin settings", err);
@@ -505,19 +506,19 @@
         return `
           <tr>
             <td style="font-family: var(--font-mono); font-weight: 600;">#${t.id}</td>
-            <td><strong>${t.ownerUsername || 'User'}</strong></td>
-            <td>${t.projectName || 'Dự án'}</td>
-            <td><span class="task-type-pill" style="font-size: 10px;">${t.type || 'TASK'}</span></td>
-            <td><span class="severity-tag ${t.status === 'COMPLETED' ? 'LOW' : 'HIGH'}">${t.status}</span></td>
+            <td><strong>${escapeHtml(t.ownerUsername || 'User')}</strong></td>
+            <td>${escapeHtml(t.projectName || 'Dự án')}</td>
+            <td><span class="task-type-pill" style="font-size: 10px;">${escapeHtml(t.type || 'TASK')}</span></td>
+            <td><span class="severity-tag ${t.status === 'COMPLETED' ? 'LOW' : 'HIGH'}">${escapeHtml(t.status)}</span></td>
             <td style="font-size: 11px; color: var(--text-muted);">${timeStr}</td>
             <td style="font-size: 11.5px; color: ${t.errorMessage ? 'var(--diff-del)' : 'var(--text-secondary)'};">
-              ${t.errorMessage ? t.errorMessage : 'Hoàn thành tốt'}
+              ${escapeHtml(t.errorMessage ? t.errorMessage : 'Hoàn thành tốt')}
             </td>
           </tr>
         `;
       }).join("");
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 
@@ -536,15 +537,15 @@
         return `
           <tr>
             <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${timeStr}</td>
-            <td><strong>${l.username || 'System'}</strong></td>
-            <td><span style="font-family: var(--font-mono); font-size: 11px; background: var(--bg-subtle); padding: 2px 6px; border-radius: 4px;">${l.action}</span></td>
-            <td style="font-size: 12px; color: var(--text-secondary);">${l.details || '-'}</td>
-            <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${l.ipAddress || '127.0.0.1'}</td>
+            <td><strong>${escapeHtml(l.username || 'System')}</strong></td>
+            <td><span style="font-family: var(--font-mono); font-size: 11px; background: var(--bg-subtle); padding: 2px 6px; border-radius: 4px;">${escapeHtml(l.action)}</span></td>
+            <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(l.details || '-')}</td>
+            <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${escapeHtml(l.ipAddress || '127.0.0.1')}</td>
           </tr>
         `;
       }).join("");
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--diff-del); padding: 16px;">Lỗi: ${escapeHtml(err.message)}</td></tr>`;
     }
   }
 

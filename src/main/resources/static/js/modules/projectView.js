@@ -11,6 +11,7 @@
  * ============================================================================
  */
 (function() {
+  const escapeHtml = window.MarkdownUtils.escapeHtml;
 
   function formatRelativeTime(dateString) {
     if (!dateString) return "vừa xong";
@@ -76,12 +77,12 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary-accent); flex-shrink: 0;">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
-                <span>${proj.name}</span>
+                <span>${escapeHtml(proj.name)}</span>
               </div>
-              <span class="project-lang-pill">${proj.language || 'Mã nguồn'}</span>
+              <span class="project-lang-pill">${escapeHtml(proj.language || 'Mã nguồn')}</span>
             </div>
-            <div class="welcome-project-path" title="${proj.path}">${proj.path || 'Local'}</div>
-            <div class="welcome-project-desc">${proj.description || 'Thư mục dự án mã nguồn đã sẵn sàng tương tác cùng AI.'}</div>
+            <div class="welcome-project-path" title="${escapeHtml(proj.path)}">${escapeHtml(proj.path || 'Local')}</div>
+            <div class="welcome-project-desc">${escapeHtml(proj.description || 'Thư mục dự án mã nguồn đã sẵn sàng tương tác cùng AI.')}</div>
           </div>
           <div class="welcome-project-footer">
             <span style="font-size: 11.5px; color: var(--text-muted);">Antigravity Workspace</span>
@@ -163,11 +164,11 @@
           const safeTitle = c.title || 'Phiên #' + c.id;
           const displayTitle = safeTitle.length > 22 ? safeTitle.slice(0, 22) + "..." : safeTitle;
           return `
-            <div class="project-session-row ${isConvActive ? 'active' : ''}" data-conv-id="${c.id}" title="${safeTitle}">
+            <div class="project-session-row ${isConvActive ? 'active' : ''}" data-conv-id="${c.id}" title="${escapeHtml(c.title || "Hội thoại")}">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-right: 5px; opacity: 0.7;">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </svg>
-              <span class="project-session-title">${displayTitle}</span>
+              <span class="project-session-title">${escapeHtml(displayTitle)}</span>
               <span class="project-session-time">${timeAgo}</span>
               <button type="button" class="project-session-del" data-del-conv-id="${c.id}" title="Xóa phiên này">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -250,11 +251,11 @@
               const safeTitle = c.title || 'Phiên #' + c.id;
               const displayTitle = safeTitle.length > 22 ? safeTitle.slice(0, 22) + "..." : safeTitle;
               return `
-                <div class="project-session-row ${isConvActive ? 'active' : ''}" data-conv-id="${c.id}" title="${safeTitle}">
+                <div class="project-session-row ${isConvActive ? 'active' : ''}" data-conv-id="${c.id}" title="${escapeHtml(c.title || "Hội thoại")}">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-right: 5px; opacity: 0.7;">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                   </svg>
-                  <span class="project-session-title">${displayTitle}</span>
+                  <span class="project-session-title">${escapeHtml(displayTitle)}</span>
                   <span class="project-session-time">${timeAgo}</span>
                   <button type="button" class="project-session-del" data-del-conv-id="${c.id}" title="Xóa phiên này">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -268,7 +269,7 @@
 
         return `
           <div class="project-tree-item ${isExpanded ? 'open' : ''}" data-tree-proj-id="${proj.id}">
-            <div class="project-tree-header ${isProjectActive ? 'active' : ''}" data-proj-id="${proj.id}" title="${proj.path || proj.name}">
+            <div class="project-tree-header ${isProjectActive ? 'active' : ''}" data-proj-id="${proj.id}" title="${escapeHtml(proj.path || proj.name)}">
               <div class="project-tree-header-left">
                 <span class="project-expand-arrow">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -278,17 +279,17 @@
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary-accent); flex-shrink: 0;">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
-                <span class="project-tree-name">${proj.name}</span>
+                <span class="project-tree-name">${escapeHtml(proj.name)}</span>
               </div>
               <div class="project-tree-header-right">
                 <span class="project-sessions-badge">${projConvs.length}</span>
-                <button type="button" class="btn-project-action" data-add-chat-proj-id="${proj.id}" title="Tạo phiên chat mới cho ${proj.name}">
+                <button type="button" class="btn-project-action" data-add-chat-proj-id="${proj.id}" title="Tạo phiên chat mới cho ${escapeHtml(proj.name)}">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
                 </button>
-                <button type="button" class="btn-project-action delete" data-delete-proj-id="${proj.id}" data-proj-name="${proj.name}" title="Xóa dự án ${proj.name}">
+                <button type="button" class="btn-project-action delete" data-delete-proj-id="${proj.id}" data-proj-name="${escapeHtml(proj.name)}" title="Xóa dự án ${escapeHtml(proj.name)}">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -452,7 +453,7 @@
       return;
     }
     el.selectTaskProject.innerHTML = state.projects.map(p => `
-      <option value="${p.id}">${p.name} (${p.language || 'Java'})</option>
+      <option value="${p.id}">${escapeHtml(p.name)} (${escapeHtml(p.language || 'Java')})</option>
     `).join("");
   }
 

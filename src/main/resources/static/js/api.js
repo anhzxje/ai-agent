@@ -21,7 +21,7 @@ class AgentApiClient {
   constructor(baseUrl = "") {
     if (baseUrl) {
       this.baseUrl = baseUrl;
-    } else if (window.location.protocol.startsWith("http") && (window.location.port === "8080" || !window.location.port)) {
+    } else if (window.location.protocol.startsWith("http")) {
       this.baseUrl = window.location.origin;
     } else {
       this.baseUrl = "http://localhost:8080";
@@ -912,25 +912,12 @@ class AgentApiClient {
   }
 
   async deleteChatConversation(convId) {
-    try {
-      const res = await fetch(`${this.baseUrl}/api/chat/conversations/${convId}`, {
-        method: "DELETE",
-        headers: this.getHeaders(),
-        signal: AbortSignal.timeout(5000)
-      });
-      if (res.ok || res.status === 404) return true;
-      let errMsg = "Không thể xóa cuộc hội thoại";
-      try {
-        const err = await res.json();
-        if (err && (err.message || err.error)) errMsg = err.message || err.error;
-      } catch (_) {}
-      throw new Error(errMsg);
-    } catch (e) {
-      if (e.message && e.message.includes("Không thể xóa")) {
-        throw e;
-      }
-      return true;
-    }
+    const res = await fetch(`${this.baseUrl}/api/chat/conversations/${convId}`, {
+      method: "DELETE", headers: this.getHeaders(), signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok || res.status === 404) return true;
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Không thể xóa cuộc hội thoại");
   }
 
   async updateChatConversationModel(convId, model) {

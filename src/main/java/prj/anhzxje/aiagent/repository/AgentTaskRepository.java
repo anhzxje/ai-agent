@@ -18,6 +18,35 @@ import java.util.Optional;
 @Repository
 public interface AgentTaskRepository extends JpaRepository<AgentTask, Long> {
 
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @org.springframework.data.jpa.repository.Query("UPDATE AgentTask t SET t.status = prj.anhzxje.aiagent.enums.JobStatus.PROCESSING, t.executionId = :executionId WHERE t.id = :id AND t.status = prj.anhzxje.aiagent.enums.JobStatus.PENDING")
+    int claimTask(Long id, String executionId);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @org.springframework.data.jpa.repository.Query("UPDATE AgentTask t SET t.status = :status, t.output = :output, t.errorMessage = :error, t.completedAt = :completedAt WHERE t.id = :id AND t.status = prj.anhzxje.aiagent.enums.JobStatus.PROCESSING AND t.executionId = :executionId")
+    int finishTask(Long id, String executionId, prj.anhzxje.aiagent.enums.JobStatus status,
+                   String output, String error, java.time.LocalDateTime completedAt);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Query("UPDATE AgentTask t SET t.status = prj.anhzxje.aiagent.enums.JobStatus.CANCELLED, t.completedAt = :completedAt, t.errorMessage = 'Tác vụ đã bị người dùng hủy theo yêu cầu.' WHERE t.id = :id AND t.status IN (prj.anhzxje.aiagent.enums.JobStatus.PENDING, prj.anhzxje.aiagent.enums.JobStatus.PROCESSING)")
+    int cancelActiveTask(Long id, java.time.LocalDateTime completedAt);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Query("UPDATE AgentTask t SET t.status = prj.anhzxje.aiagent.enums.JobStatus.PENDING, t.executionId = null, t.output = null, t.errorMessage = null, t.completedAt = null WHERE t.id = :id AND t.status IN (prj.anhzxje.aiagent.enums.JobStatus.COMPLETED, prj.anhzxje.aiagent.enums.JobStatus.ERROR, prj.anhzxje.aiagent.enums.JobStatus.CANCELLED)")
+    int resetForRetry(Long id);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @org.springframework.data.jpa.repository.Query("UPDATE AgentTask t SET t.status = prj.anhzxje.aiagent.enums.JobStatus.ERROR, t.errorMessage = :error, t.completedAt = :completedAt WHERE t.id = :id AND t.status = prj.anhzxje.aiagent.enums.JobStatus.PENDING")
+    int rejectPendingTask(Long id, String error, java.time.LocalDateTime completedAt);
+
+    @EntityGraph(attributePaths = {"project", "user"})
+    org.springframework.data.domain.Page<AgentTask> findByUserIdAndStatus(Long userId, prj.anhzxje.aiagent.enums.JobStatus status, org.springframework.data.domain.Pageable pageable);
+
     /**
      * Tìm kiếm tác vụ AI theo ID và nạp trước thực thể Project và User để tránh N+1 query.
      *

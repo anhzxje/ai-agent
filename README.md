@@ -1,6 +1,6 @@
 # Soopi - Nền tảng Tác tử AI Đánh giá Mã nguồn (AI Agent Code Reviewer)
 
-> Hệ thống Tác tử AI hỗ trợ tự động rà soát mã nguồn, kiểm tra bảo mật, phát hiện lỗi logic, tối ưu hiệu năng và hội thoại kỹ thuật phần mềm dựa trên **Java 21**, **Spring Boot 3.3.4**, **Spring AI**, **Google Gemini API**, **Spring Security (JWT)** và **MySQL 8.x**.
+> Nền tảng AI hỗ trợ code review và hội thoại kỹ thuật; sử dụng **Java 21**, **Spring Boot 4.1.0**, **Spring AI**, **Google Gemini API**, **Spring Security (JWT)** và **MySQL 8.x**. Hiện chỉ tác vụ `CODE_REVIEW` được hỗ trợ.
 
 ---
 
@@ -19,12 +19,12 @@
 ## 2. Kiến trúc & Công nghệ Thực tế
 
 ### Công nghệ sử dụng
-- **Backend**: Java 21, Spring Boot 3.3.4, Spring Data JPA, Hibernate ORM, Transaction Management.
+- **Backend**: Java 21, Spring Boot 4.1.0, Spring Data JPA, Hibernate ORM, Transaction Management.
 - **AI Engine**: Spring AI (`spring-ai-starter-model-google-genai`), Google Gemini API với bộ mô hình linh hoạt:
   1. `gemini-3.5-flash-lite` (Mặc định - Phản hồi siêu tốc, tiết kiệm token, tối ưu hội thoại)
   2. `gemini-2.5-flash` (Lập luận sâu, phân tích cấu trúc mã nguồn toàn diện)
   3. `gemini-2.5-pro` (Phân tích chuyên sâu cho các bài toán kiến trúc phức tạp)
-  4. `gemini-1.5-flash` & `gemini-1.5-pro` (Tương thích ngược)
+
 - **Bảo mật**: Spring Security 6, JJWT (JSON Web Token), BCrypt Password Encoder, Strict Path Normalization (Anti Path Traversal Sandbox).
 - **Cơ sở dữ liệu**: MySQL 8.x với hỗ trợ kiểu dữ liệu JSON (`SqlTypes.JSON`), kiểm tra ping kết nối và đo độ trễ trực tiếp.
 - **Giao diện Web Modular (Vanilla JavaScript ES6+)**:
@@ -41,7 +41,7 @@
 ### Cấu trúc mã nguồn chi tiết
 ```text
 aiagent/
-├── pom.xml                     # Cấu hình Maven, Spring Boot 3.3.4 và Spring AI
+├── pom.xml                     # Cấu hình Maven, Spring Boot 4.1.0 và Spring AI
 ├── mvnw / mvnw.cmd             # Maven Wrapper khởi chạy ứng dụng
 └── src/
     ├── main/
@@ -59,7 +59,7 @@ aiagent/
     │   └── resources/
     │       ├── application.yml # Cấu hình cổng 8080, datasource MySQL, JWT secret, model Gemini
     │       └── static/         # Giao diện Web Modular (HTML, CSS, JS Modules)
-    └── test/                   # Toàn bộ 135 unit tests tự động (Controller, Service, Security, DTO, Repository)
+    └── test/                   # Kiểm thử Java và JavaScript cho service, security, HTTP, database và giao diện
 ```
 
 ---
@@ -138,7 +138,12 @@ CREATE DATABASE ai_agent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 Thiết lập Gemini API Key trên máy Windows PowerShell:
 ```powershell
 [System.Environment]::SetEnvironmentVariable('GOOGLE_API_KEY', 'AIzaSy_KEY_CỦA_BẠN', 'User')
+[System.Environment]::SetEnvironmentVariable('ADMIN_INITIAL_PASSWORD', 'MAT_KHAU_DAI_IT_NHAT_12_KY_TU', 'User')
 ```
+
+Đặt `ADMIN_INITIAL_PASSWORD` trước lần khởi chạy đầu tiên để tạo tài khoản quản trị `admin`. Mật khẩu cần dài ít nhất 12 ký tự. Nếu tài khoản đã tồn tại, ứng dụng không thay đổi mật khẩu.
+
+Khi dùng Docker Compose, hãy cấu hình `DB_ROOT_PASSWORD`, `DB_PASSWORD`, `GOOGLE_API_KEY`, `JWT_SECRET` và `ADMIN_INITIAL_PASSWORD`. Ứng dụng kết nối MySQL bằng người dùng `ai_agent` thay vì tài khoản `root`.
 
 ### 4. Khởi chạy Backend Server
 Sử dụng Maven Wrapper để chạy server:
@@ -147,9 +152,7 @@ Sử dụng Maven Wrapper để chạy server:
 ```
 Server chạy tại địa chỉ chuẩn: **`http://localhost:8080`**
 
-> **Tài khoản khởi tạo tự động (DataInitializer):**
-> - **Tài khoản Admin:** `username: admin` | `password: admin`
-> - Đăng nhập tài khoản Admin để truy cập toàn bộ các tính năng Quản trị hệ thống, Bật/tắt công cụ, và Nhật ký kiểm toán.
+> Tài khoản quản trị được tạo từ biến `ADMIN_INITIAL_PASSWORD`; không có mật khẩu mặc định dùng chung.
 
 ---
 
@@ -193,7 +196,7 @@ Server chạy tại địa chỉ chuẩn: **`http://localhost:8080`**
 
 ## 7. Kiểm thử Tự động (Automated Tests)
 
-Dự án sở hữu bộ kiểm thử tự động toàn diện với **135 test cases** đạt tỉ lệ vượt qua **100%**:
+Dự án có bộ kiểm thử tự động cho backend và giao diện. Lần xác minh gần nhất chạy **148 bài kiểm thử Maven** (147 thành công, 1 bài symlink được bỏ qua trên Windows) và **5 bài kiểm thử JavaScript** thành công:
 - **Agent Tests**: Kiểm tra cơ chế tự động suy luận (Reasoning) và gọi công cụ (Tool Calling) của `CodeReviewAgent`.
 - **Controller Tests**: Đầy đủ ca kiểm thử cho AdminController, ChatController, ProjectController, TaskController, AuthController, UserController, SystemController.
 - **Service Tests**: Bao phủ logic xử lý nghiệp vụ, kiểm tra quyền sở hữu IDOR, cascade xóa và rollback transaction.
@@ -202,6 +205,7 @@ Dự án sở hữu bộ kiểm thử tự động toàn diện với **135 test
 Chạy toàn bộ kiểm thử:
 ```powershell
 .\mvnw.cmd test
+node --test src/test/js/frontend.test.cjs
 ```
 
 ---

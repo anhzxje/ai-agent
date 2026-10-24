@@ -225,9 +225,10 @@ public class CodeReviewAgent {
         // ====================================================================
         if (toolManagerService != null) {
             List<Object> dynamicTools = toolManagerService.resolveActiveTools(requestedTools, projectPath);
-            if (!dynamicTools.isEmpty()) {
-                promptSpec.tools(dynamicTools.toArray());
+            if (dynamicTools.isEmpty()) {
+                throw new IllegalStateException("Cần bật ít nhất một công cụ để đọc mã nguồn trước khi review");
             }
+            promptSpec.tools(dynamicTools.toArray());
         }
 
         // ====================================================================

@@ -311,7 +311,9 @@ public class AdminController {
                 pageNum, pageSize, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
 
         List<AgentTask> tasks;
-        if (userId != null) {
+        if (userId != null && status != null) {
+            tasks = agentTaskRepository.findByUserIdAndStatus(userId, status, pageable).getContent();
+        } else if (userId != null) {
             tasks = agentTaskRepository.findByUserId(userId, pageable).getContent();
         } else if (status != null) {
             tasks = agentTaskRepository.findByStatus(status, pageable).getContent();

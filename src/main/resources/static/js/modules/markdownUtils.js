@@ -1,82 +1,72 @@
-/**
- * ============================================================================
- * MARKDOWN UTILITIES - ĐỊNH DẠNG VĂN BẢN VÀ CODE SNIPPET CHO AI CHATBOT
- * ============================================================================
- * Chức năng:
- * 1. Chống tấn công XSS bằng cơ chế escape HTML an toàn.
- * 2. Phân tích cú pháp code blocks (```language\n...```) kèm thanh công cụ header
- *    hiển thị tên ngôn ngữ lập trình và nút "Sao chép" (Copy code).
- * 3. Hỗ trợ inline code (`code`), chữ đậm (**bold**), chữ nghiêng (*italic*).
- * 4. Hỗ trợ tiêu đề các cấp (h1, h2, h3), danh sách bullet points (ul/li).
- * ============================================================================
- */
+/** Escaping and a deliberately small Markdown renderer for untrusted AI output. */
 (function() {
-  function formatMarkdown(content) {
-    if (!content) return "";
-    let html = content;
-
-    // 1. Escape HTML first to prevent XSS
-    html = html
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    // 2. Multi-line code blocks with language header and copy button
-    html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
-      const language = lang ? lang.toLowerCase() : "code";
-      const cleanCode = code.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-      const encodedCode = encodeURIComponent(cleanCode);
-      return `
-        <div class="chat-code-block">
-          <div class="code-header-bar">
-            <span>${language}</span>
-            <button class="btn-code-copy" onclick="window.MarkdownUtils.copyCodeSnippet(this, decodeURIComponent('${encodedCode}'))">Sao chép</button>
-          </div>
-          <pre><code class="language-${language}">${code}</code></pre>
-        </div>
-      `;
-    });
-
-    // 3. Inline code
-    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-
-    // 4. Bold text
-    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-
-    // 5. Italic text
-    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-
-    // 6. Headings (h1, h2, h3)
-    html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
-    html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
-    html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
-
-    // 7. Bullet point lists
-    html = html.replace(/^\s*[-*]\s+(.*$)/gim, "<li>$1</li>");
-    html = html.replace(/(<li>.*<\/li>)/gims, "<ul>$1</ul>");
-
-    // 8. Paragraphs and line breaks
-    html = html.replace(/\n\n/g, "</p><p>");
-    html = html.replace(/\n/g, "<br>");
-
-    return `<p>${html}</p>`;
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[char]);
   }
 
-  // Helper copy code snippet to clipboard with visual feedback
+  function inline(text) {
+    return text.split(/(`[^`]+`)/g).map(part => {
+      if (part.startsWith("`") && part.endsWith("`")) {
+        return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
+      }
+      return escapeHtml(part)
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    }).join("");
+  }
+
+  function prose(text) {
+    let result = "";
+    let inList = false;
+    for (const line of text.split("\n")) {
+      const item = line.match(/^\s*[-*]\s+(.+)$/);
+      if (item) {
+        if (!inList) result += "<ul>";
+        inList = true;
+        result += `<li>${inline(item[1])}</li>`;
+        continue;
+      }
+      if (inList) { result += "</ul>"; inList = false; }
+      const heading = line.match(/^(#{1,3})\s+(.+)$/);
+      if (heading) {
+        const level = heading[1].length;
+        result += `<h${level}>${inline(heading[2])}</h${level}>`;
+      } else if (line.trim()) {
+        result += `<p>${inline(line)}</p>`;
+      }
+    }
+    return result + (inList ? "</ul>" : "");
+  }
+
+  function formatMarkdown(content) {
+    if (content == null) return "";
+    const text = String(content).replace(/\r\n?/g, "\n");
+    const fences = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+    let html = "";
+    let cursor = 0;
+    for (const match of text.matchAll(fences)) {
+      html += prose(text.slice(cursor, match.index));
+      const language = (match[1] || "code").toLowerCase();
+      html += `<div class="chat-code-block"><div class="code-header-bar"><span>${language}</span>
+        <button class="btn-code-copy" onclick="window.MarkdownUtils.copyCodeSnippet(this)">Sao chép</button>
+        </div><pre><code class="language-${language}">${escapeHtml(match[2])}</code></pre></div>`;
+      cursor = match.index + match[0].length;
+    }
+    return html + prose(text.slice(cursor));
+  }
+
   function copyCodeSnippet(btn, code) {
     if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(code).then(() => {
-      const orig = btn.textContent;
+    const text = code ?? btn.closest(".chat-code-block")?.querySelector("pre code")?.textContent ?? "";
+    navigator.clipboard.writeText(text).then(() => {
+      const original = btn.textContent;
       btn.textContent = "Đã chép!";
-      setTimeout(() => { btn.textContent = orig; }, 2000);
+      setTimeout(() => { btn.textContent = original; }, 2000);
     }).catch(e => console.warn("Lỗi sao chép clipboard:", e));
   }
 
-  // Export to window
-  window.MarkdownUtils = {
-    formatMarkdown,
-    copyCodeSnippet
-  };
-  // Backward compatibility alias for existing inline onclick calls
+  window.MarkdownUtils = { escapeHtml, formatMarkdown, copyCodeSnippet };
   window.copyCodeSnippet = copyCodeSnippet;
 })();

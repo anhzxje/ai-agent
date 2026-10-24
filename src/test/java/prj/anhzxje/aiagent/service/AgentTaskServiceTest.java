@@ -110,6 +110,7 @@ class AgentTaskServiceTest {
     void testCreateTask_ProjectNotFound() {
         AgentTaskRequest request = new AgentTaskRequest();
         request.setProjectId(99L);
+        request.setType(TaskType.CODE_REVIEW);
 
         when(projectRepository.findById(99L)).thenReturn(Optional.empty());
 
@@ -121,6 +122,7 @@ class AgentTaskServiceTest {
         Project otherProject = Project.builder().id(20L).user(otherUser).build();
         AgentTaskRequest request = new AgentTaskRequest();
         request.setProjectId(20L);
+        request.setType(TaskType.CODE_REVIEW);
 
         when(projectRepository.findById(20L)).thenReturn(Optional.of(otherProject));
 
