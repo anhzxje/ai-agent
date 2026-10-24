@@ -36,6 +36,9 @@ public class DataInitializer implements CommandLineRunner {
     private final SystemSettingRepository systemSettingRepository;
     private final AuditLogService auditLogService;
 
+    @org.springframework.beans.factory.annotation.Value("${bootstrap.admin-password:}")
+    private String initialAdminPassword;
+
     /**
      * Constructor phục vụ kiểm thử đơn vị hoặc khi chỉ cần khởi tạo User và PasswordEncoder.
      *
@@ -83,10 +86,14 @@ public class DataInitializer implements CommandLineRunner {
      */
     private void initAdminUser() {
         if (!userRepository.existsByUsername("admin")) {
+            if (initialAdminPassword == null || initialAdminPassword.length() < 12) {
+                log.warn("Bỏ qua tạo admin: cần ADMIN_INITIAL_PASSWORD dài ít nhất 12 ký tự");
+                return;
+            }
             User admin = User.builder()
                     .username("admin")
                     .email("admin@admin.admin")
-                    .password(passwordEncoder.encode("admin"))
+                    .password(passwordEncoder.encode(initialAdminPassword))
                     .role(Role.ADMIN)
                     .isLocked(false)
                     .build();

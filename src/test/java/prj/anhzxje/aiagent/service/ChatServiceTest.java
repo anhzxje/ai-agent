@@ -191,7 +191,7 @@ class ChatServiceTest {
     void testSendMessage_WithConversationHistory_MultiTurnSuccess() {
         ChatMessage oldMsg = ChatMessage.builder().id(101L).conversation(conversation).sender("USER").content("Tôi tên Minh").build();
         when(conversationRepository.findById(10L)).thenReturn(Optional.of(conversation));
-        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of(oldMsg));
+        when(messageRepository.findTop10ByConversationIdOrderByCreatedAtDescIdDesc(10L)).thenReturn(List.of(oldMsg));
         when(messageRepository.save(any(ChatMessage.class))).thenAnswer(i -> {
             ChatMessage m = i.getArgument(0);
             m.setId(102L);
@@ -231,7 +231,7 @@ class ChatServiceTest {
         conversation.setProject(project);
 
         when(conversationRepository.findById(10L)).thenReturn(Optional.of(conversation));
-        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
+        when(messageRepository.findTop10ByConversationIdOrderByCreatedAtDescIdDesc(10L)).thenReturn(List.of());
         when(messageRepository.save(any(ChatMessage.class))).thenAnswer(i -> {
             ChatMessage m = i.getArgument(0);
             m.setId(103L);

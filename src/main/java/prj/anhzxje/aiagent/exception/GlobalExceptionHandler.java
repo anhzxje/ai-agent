@@ -27,6 +27,21 @@ import java.time.LocalDateTime;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<ErrorResponse> handleSandboxException(SecurityException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ErrorResponse.builder()
+                .status(403).message(ex.getMessage()).path(request.getRequestURI())
+                .timestamp(LocalDateTime.now()).build());
+    }
+
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ErrorResponse> handleMalformedRequest(Exception ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(ErrorResponse.builder()
+                .status(400).message("Dữ liệu yêu cầu không hợp lệ").path(request.getRequestURI())
+                .timestamp(LocalDateTime.now()).build());
+    }
+
     /**
      * Xử lý lỗi không tìm thấy tài nguyên (404 Not Found).
      * Phát sinh khi: User tìm Task, Project, Conversation hoặc User không tồn tại hoặc không thuộc quyền sở hữu.

@@ -36,7 +36,8 @@ class DataInitializerTest {
     @Test
     void testRun_WhenAdminDoesNotExist_CreatesAdminUser() {
         when(userRepository.existsByUsername("admin")).thenReturn(false);
-        when(passwordEncoder.encode("admin")).thenReturn("encodedPassword");
+        org.springframework.test.util.ReflectionTestUtils.setField(dataInitializer, "initialAdminPassword", "test-admin-password");
+        when(passwordEncoder.encode("test-admin-password")).thenReturn("encodedPassword");
 
         dataInitializer.run();
 

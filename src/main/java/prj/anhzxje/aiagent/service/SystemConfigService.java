@@ -46,8 +46,12 @@ public class SystemConfigService {
     private String envApiKey;
 
     /** Danh sách đường dẫn thư mục được cấp phép quét mã nguồn */
-    @Value("${agent.allowed-paths:#{T(java.util.Collections).emptyList()}}")
-    private List<String> allowedPaths;
+    private List<String> allowedPaths = List.of();
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void configureAgentPaths(prj.anhzxje.aiagent.config.AgentProperties properties) {
+        this.allowedPaths = properties.getAllowedPaths();
+    }
 
     /**
      * Lấy tên mô hình AI đang kích hoạt hiện tại trong hệ thống.

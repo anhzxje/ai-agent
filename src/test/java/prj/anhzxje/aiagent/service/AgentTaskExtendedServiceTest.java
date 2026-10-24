@@ -103,7 +103,10 @@ class AgentTaskExtendedServiceTest {
     @Test
     void testCancelTask_Success() {
         when(agentTaskRepository.findById(100L)).thenReturn(Optional.of(myTask));
-        when(agentTaskRepository.save(any(AgentTask.class))).thenAnswer(i -> i.getArgument(0));
+        when(agentTaskRepository.cancelActiveTask(eq(100L), any())).thenAnswer(i -> {
+            myTask.setStatus(JobStatus.CANCELLED);
+            return 1;
+        });
 
         AgentTaskResponse res = agentTaskService.cancelTask(100L);
 
@@ -136,7 +139,11 @@ class AgentTaskExtendedServiceTest {
         myTask.setStatus(JobStatus.ERROR);
         myTask.setErrorMessage("Some error");
         when(agentTaskRepository.findById(100L)).thenReturn(Optional.of(myTask));
-        when(agentTaskRepository.save(any(AgentTask.class))).thenAnswer(i -> i.getArgument(0));
+        when(agentTaskRepository.resetForRetry(100L)).thenAnswer(i -> {
+            myTask.setStatus(JobStatus.PENDING);
+            myTask.setErrorMessage(null);
+            return 1;
+        });
 
         AgentTaskResponse res = agentTaskService.retryTask(100L);
 

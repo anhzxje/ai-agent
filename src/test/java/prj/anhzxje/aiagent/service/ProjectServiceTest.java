@@ -72,6 +72,7 @@ class ProjectServiceTest {
         otherUser = User.builder().id(2L).username("otheruser").role(Role.USER).build();
 
         demoDir = Files.createDirectories(tempDir.resolve("demo"));
+        org.springframework.test.util.ReflectionTestUtils.setField(projectService, "allowedPaths", List.of(tempDir.toString()));
 
         sampleProject = Project.builder()
                 .id(10L)

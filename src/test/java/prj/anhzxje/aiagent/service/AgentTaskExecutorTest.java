@@ -4,127 +4,110 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import prj.anhzxje.aiagent.agent.CodeReviewAgent;
-import prj.anhzxje.aiagent.entity.AgentTask;
 import prj.anhzxje.aiagent.enums.JobStatus;
 import prj.anhzxje.aiagent.enums.TaskType;
 import prj.anhzxje.aiagent.repository.AgentTaskRepository;
 
-import java.io.File;
+import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Kiểm thử Bộ Thực thi Tác vụ Ngầm (AgentTaskExecutorTest):
- * Kiểm tra:
- * 1. Cơ chế thực thi bất đồng bộ trên luồng riêng.
- * 2. Cập nhật trạng thái PENDING -> PROCESSING -> COMPLETED/ERROR.
- * 3. Kiểm tra tính năng Sandbox an toàn (chặn đường dẫn không nằm trong allowed-paths).
- */
 @ExtendWith(MockitoExtension.class)
 class AgentTaskExecutorTest {
-
-    @Mock
-    private CodeReviewAgent codeReviewAgent;
-
-    @Mock
-    private AgentTaskRepository agentTaskRepository;
-
-    @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
-
-    @InjectMocks
-    private AgentTaskExecutor agentTaskExecutor;
-
-    private AgentTask task;
-    private String allowedDir;
+    private static final String REPORT = "{\"summary\":\"OK\",\"issues\":[],\"suggestions\":[]}";
+    @Mock CodeReviewAgent codeReviewAgent;
+    @Mock AgentTaskRepository agentTaskRepository;
+    @Spy ObjectMapper objectMapper = new ObjectMapper();
+    @InjectMocks AgentTaskExecutor executor;
+    @TempDir Path root;
 
     @BeforeEach
-    void setUp() {
-        allowedDir = new File(".").getAbsolutePath();
-        ReflectionTestUtils.setField(agentTaskExecutor, "allowedPaths", List.of(allowedDir));
-
-        task = AgentTask.builder()
-                .id(1L)
-                .status(JobStatus.PENDING)
-                .build();
-
-        lenient().when(agentTaskRepository.findById(1L)).thenReturn(Optional.of(task));
+    void setup() {
+        ReflectionTestUtils.setField(executor, "allowedPaths", List.of(root.toString()));
+        lenient().when(agentTaskRepository.claimTask(eq(1L), anyString())).thenReturn(1);
     }
 
     @Test
-    void testExecuteTaskAsync_Success() {
-        when(codeReviewAgent.reviewPath(anyString(), any())).thenReturn("{\"summary\":\"OK\"}");
-
-        agentTaskExecutor.executeTaskAsync(1L, allowedDir, "{\"focus\":\"security\"}", TaskType.CODE_REVIEW);
-
-        assertEquals(JobStatus.COMPLETED, task.getStatus());
-        assertEquals("{\"summary\":\"OK\"}", task.getOutput());
+    void completesValidReport() {
+        when(codeReviewAgent.reviewPath(anyString(), eq("security"))).thenReturn(REPORT);
+        executor.executeTaskAsync(1L, root.toString(), "{\"focus\":\"security\"}", TaskType.CODE_REVIEW);
+        verify(agentTaskRepository).finishTask(eq(1L), anyString(), eq(JobStatus.COMPLETED), eq(REPORT), isNull(), any());
     }
 
     @Test
-    void testExecuteTaskAsync_PathTraversal_Fails() {
-        String forbiddenPath = allowedDir + "/../../etc/passwd";
-
-        agentTaskExecutor.executeTaskAsync(1L, forbiddenPath, null, TaskType.CODE_REVIEW);
-
-        assertEquals(JobStatus.ERROR, task.getStatus());
+    void cancelledDeletedOrAlreadyClaimedTasksNeverCallAi() {
+        when(agentTaskRepository.claimTask(eq(1L), anyString())).thenReturn(0);
+        executor.executeTaskAsync(1L, root.toString(), null, TaskType.CODE_REVIEW);
+        verifyNoInteractions(codeReviewAgent);
+        verify(agentTaskRepository, never()).finishTask(any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    void testExecuteTaskAsync_EmptyPath_Fails() {
-        agentTaskExecutor.executeTaskAsync(1L, "", null, TaskType.CODE_REVIEW);
-
-        assertEquals(JobStatus.ERROR, task.getStatus());
+    void emptyAllowlistDeniesAccess() {
+        ReflectionTestUtils.setField(executor, "allowedPaths", List.of());
+        executor.executeTaskAsync(1L, root.toString(), null, TaskType.CODE_REVIEW);
+        verifyNoInteractions(codeReviewAgent);
+        verifyFailure();
     }
 
     @Test
-    void testExecuteTaskAsync_CodeExplainAndTestGeneration() {
-        when(codeReviewAgent.reviewPath(anyString(), any())).thenReturn("{\"summary\":\"OK\"}");
-
-        agentTaskExecutor.executeTaskAsync(1L, allowedDir, null, TaskType.CODE_EXPLAIN);
-        assertEquals(JobStatus.COMPLETED, task.getStatus());
-
-        agentTaskExecutor.executeTaskAsync(1L, allowedDir, null, TaskType.TEST_GENERATION);
-        assertEquals(JobStatus.COMPLETED, task.getStatus());
+    void rejectsTraversalOutsideProject() {
+        executor.executeTaskAsync(1L, root.resolve("..").toString(), null, TaskType.CODE_REVIEW);
+        verifyNoInteractions(codeReviewAgent);
+        verifyFailure();
     }
 
     @Test
-    void testExecuteTaskAsync_AllowedPathsEmpty_AllowsAll() {
-        ReflectionTestUtils.setField(agentTaskExecutor, "allowedPaths", List.of());
-        when(codeReviewAgent.reviewPath(anyString(), any())).thenReturn("{\"summary\":\"OK\"}");
-
-        agentTaskExecutor.executeTaskAsync(1L, allowedDir, null, TaskType.CODE_REVIEW);
-
-        assertEquals(JobStatus.COMPLETED, task.getStatus());
+    void rejectsUnsupportedTaskInsteadOfReviewFallback() {
+        executor.executeTaskAsync(1L, root.toString(), null, TaskType.CODE_FIX);
+        verifyNoInteractions(codeReviewAgent);
+        verifyFailure();
     }
 
     @Test
-    void testExecuteTaskAsync_WithValidOverridePathInJson() {
-        when(codeReviewAgent.reviewPath(anyString(), any())).thenReturn("{\"summary\":\"OK\"}");
-
-        String json = "{\"projectPath\":\"" + allowedDir.replace("\\", "\\\\") + "\",\"focus\":\"performance\"}";
-        agentTaskExecutor.executeTaskAsync(1L, allowedDir, json, TaskType.CODE_REVIEW);
-
-        assertEquals(JobStatus.COMPLETED, task.getStatus());
+    void forwardsUserPrompt() {
+        when(codeReviewAgent.reviewPath(anyString(), eq("security\nCheck authentication"))).thenReturn(REPORT);
+        executor.executeTaskAsync(1L, root.toString(), "{\"focus\":\"security\",\"prompt\":\"Check authentication\"}", TaskType.CODE_REVIEW);
+        verify(codeReviewAgent).reviewPath(anyString(), eq("security\nCheck authentication"));
     }
 
     @Test
-    void testExecuteTaskAsync_WithInvalidOverridePathInJson() {
-        when(codeReviewAgent.reviewPath(anyString(), any())).thenReturn("{\"summary\":\"OK\"}");
+    void preservesExplicitEmptyToolSelection() {
+        when(codeReviewAgent.reviewPath(anyString(), isNull(), eq(List.of()), isNull())).thenReturn(REPORT);
+        executor.executeTaskAsync(1L, root.toString(), "{\"selectedTools\":[]}", TaskType.CODE_REVIEW);
+        verify(codeReviewAgent).reviewPath(anyString(), isNull(), eq(List.of()), isNull());
+    }
 
-        String json = "{\"projectPath\":\"/forbidden/path/123\",\"focus\":\"performance\"}";
-        agentTaskExecutor.executeTaskAsync(1L, allowedDir, json, TaskType.CODE_REVIEW);
+    @Test
+    void invalidJsonInputNeverCallsAi() {
+        executor.executeTaskAsync(1L, root.toString(), "{broken", TaskType.CODE_REVIEW);
+        verifyNoInteractions(codeReviewAgent);
+        verifyFailure();
+    }
 
-        assertEquals(JobStatus.COMPLETED, task.getStatus());
+    @Test
+    void malformedReportDoesNotComplete() {
+        when(codeReviewAgent.reviewPath(anyString(), any())).thenReturn("{\"summary\":\"missing arrays\"}");
+        executor.executeTaskAsync(1L, root.toString(), null, TaskType.CODE_REVIEW);
+        verifyFailure();
+    }
+
+    @Test
+    void truncatesProviderErrorsToDatabaseColumnLength() {
+        when(codeReviewAgent.reviewPath(anyString(), any())).thenThrow(new RuntimeException("x".repeat(1500)));
+        executor.executeTaskAsync(1L, root.toString(), null, TaskType.CODE_REVIEW);
+        verify(agentTaskRepository).finishTask(eq(1L), anyString(), eq(JobStatus.ERROR), isNull(), eq("x".repeat(1000)), any());
+    }
+
+    private void verifyFailure() {
+        verify(agentTaskRepository).finishTask(eq(1L), anyString(), eq(JobStatus.ERROR), isNull(), anyString(), any());
     }
 }

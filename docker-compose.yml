@@ -7,8 +7,10 @@ services:
     container_name: aiagent_mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ai_agent
+      MYSQL_USER: ${DB_USERNAME:-ai_agent}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -30,17 +32,19 @@ services:
       - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ai_agent?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-root}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-root}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-YOUR_GEMINI_API_KEY}
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-ai_agent}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?Set GOOGLE_API_KEY}
+      JWT_SECRET: ${JWT_SECRET:?Set a random Base64 JWT_SECRET before starting}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?Set ADMIN_INITIAL_PASSWORD}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
       AGENT_ALLOWED_PATH: /workspace
     depends_on:
       mysql:
         condition: service_healthy
     volumes:
       # Mount thư mục local vào container để AI Agent đọc mã nguồn (Tùy chỉnh theo máy bạn bè)
-      - ./:/workspace
+      - ./:/workspace:ro
 
 volumes:
   mysql_data:

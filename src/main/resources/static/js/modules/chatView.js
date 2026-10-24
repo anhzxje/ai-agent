@@ -11,6 +11,7 @@
  * ============================================================================
  */
 (function() {
+  const escapeHtml = window.MarkdownUtils.escapeHtml;
 
   /**
    * Render danh sách các phát hiện lỗi / bảo mật từ kết quả Code Review (B5-03).
@@ -39,7 +40,7 @@
             <div style="margin-top: 8px; font-size: 12px;">
               <strong style="color: var(--text-secondary);">Đề xuất khắc phục:</strong>
               <div class="chat-code-block" style="margin-top: 4px;">
-                <pre><code>${f.suggestion}</code></pre>
+                <pre><code>${escapeHtml(f.suggestion)}</code></pre>
               </div>
             </div>
           ` : '';
@@ -48,13 +49,13 @@
             <div class="finding-card" style="border: 1px solid var(--border-color); background: var(--bg-surface); border-radius: 8px; padding: 12px;">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="severity-tag ${sevClass}" style="font-size: 10px; font-weight: 700; padding: 2px 6px;">${sev}</span>
-                  <strong style="font-size: 13px; color: var(--text-primary);">${f.title || 'Phát hiện mã nguồn'}</strong>
+                  <span class="severity-tag ${sevClass}" style="font-size: 10px; font-weight: 700; padding: 2px 6px;">${escapeHtml(sev)}</span>
+                  <strong style="font-size: 13px; color: var(--text-primary);">${escapeHtml(f.title || 'Phát hiện mã nguồn')}</strong>
                 </div>
-                ${fileLoc ? `<span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${fileLoc}</span>` : ''}
+                ${fileLoc ? `<span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${escapeHtml(fileLoc)}</span>` : ''}
               </div>
               <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
-                ${f.description || ''}
+                ${escapeHtml(f.description || '')}
               </div>
               ${suggestionHtml}
             </div>
@@ -79,8 +80,8 @@
           wsChatList.innerHTML = `<div style="font-size: 11px; color: var(--text-muted); padding: 8px;">Chưa có hội thoại nào</div>`;
         } else {
           wsChatList.innerHTML = state.conversations.map(c => `
-            <div class="chat-conv-item ${c.id === state.activeConversationId ? 'active' : ''}" data-conv-id="${c.id}" title="${c.title}">
-              ${c.title || 'Hội thoại #' + c.id}
+            <div class="chat-conv-item ${c.id === state.activeConversationId ? 'active' : ''}" data-conv-id="${c.id}" title="${escapeHtml(c.title)}">
+              ${escapeHtml(c.title || 'Hội thoại #' + c.id)}
             </div>
           `).join("");
           wsChatList.querySelectorAll(".chat-conv-item").forEach(item => {
@@ -174,7 +175,7 @@
     } catch (e) {
       console.error("Lỗi khi tải chi tiết cuộc hội thoại:", e);
       if (el.chatMessagesList) {
-        el.chatMessagesList.innerHTML = `<div style="color: var(--diff-del); text-align: center; padding: 20px;">Không thể tải tin nhắn: ${e.message}</div>`;
+        el.chatMessagesList.innerHTML = `<div style="color: var(--diff-del); text-align: center; padding: 20px;">Không thể tải tin nhắn: ${escapeHtml(e.message)}</div>`;
       }
     }
   }
@@ -189,7 +190,7 @@
 
     if (el.chatEmptyState) el.chatEmptyState.style.display = "none";
 
-    const formatMd = window.MarkdownUtils ? window.MarkdownUtils.formatMarkdown : (t => t);
+    const formatMd = window.MarkdownUtils ? window.MarkdownUtils.formatMarkdown : escapeHtml;
 
     el.chatMessagesList.innerHTML = messages.map(m => {
       const isUser = m.sender === "USER";
@@ -197,7 +198,7 @@
 
       let bodyHtml;
       if (isUser) {
-        bodyHtml = `<div class="chat-msg-bubble">${m.content}</div>`;
+        bodyHtml = `<div class="chat-msg-bubble">${escapeHtml(m.content)}</div>`;
       } else {
         // Kiểm tra xem message có chứa JSON findings không để render trực quan (B5-03)
         let findingsHtml = "";
@@ -215,7 +216,7 @@
 
       return `
         <div class="chat-msg-row ${isUser ? 'user' : 'agent'}">
-          <div class="chat-msg-avatar">${isUser ? userInitial : 'AI'}</div>
+          <div class="chat-msg-avatar">${escapeHtml(isUser ? userInitial : 'AI')}</div>
           ${bodyHtml}
         </div>
       `;
@@ -279,6 +280,8 @@
       await apiClient.deleteChatConversation(convId);
     } catch (e) {
       console.warn("Lỗi API khi xóa cuộc hội thoại:", e);
+      alert(e.message || "Không thể xóa cuộc hội thoại");
+      return;
     }
     state.conversations = state.conversations.filter(c => Number(c.id) !== Number(convId));
     if (Number(state.activeConversationId) === Number(convId)) {
@@ -308,8 +311,8 @@
     const userRow = document.createElement("div");
     userRow.className = "chat-msg-row user";
     userRow.innerHTML = `
-      <div class="chat-msg-avatar">${userInitial}</div>
-      <div class="chat-msg-bubble">${message}</div>
+      <div class="chat-msg-avatar">${escapeHtml(userInitial)}</div>
+      <div class="chat-msg-bubble">${escapeHtml(message)}</div>
     `;
     if (el.chatMessagesList) el.chatMessagesList.appendChild(userRow);
 
@@ -329,7 +332,7 @@
     }
 
     const selectedModel = el.selectChatModel ? el.selectChatModel.value : null;
-    const formatMd = window.MarkdownUtils ? window.MarkdownUtils.formatMarkdown : (t => t);
+    const formatMd = window.MarkdownUtils ? window.MarkdownUtils.formatMarkdown : escapeHtml;
 
     try {
       const response = await apiClient.sendChatMessage(
@@ -395,7 +398,7 @@
       errRow.innerHTML = `
         <div class="chat-msg-avatar" style="color: var(--diff-del);">!</div>
         <div class="chat-msg-bubble" style="border-color: rgba(239, 68, 68, 0.4); color: var(--diff-del);">
-          Đã xảy ra lỗi khi trao đổi với AI: ${e.message}
+          Đã xảy ra lỗi khi trao đổi với AI: ${escapeHtml(e.message)}
         </div>
       `;
       if (el.chatMessagesList) el.chatMessagesList.appendChild(errRow);

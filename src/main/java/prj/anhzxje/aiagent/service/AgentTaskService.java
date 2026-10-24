@@ -79,6 +79,9 @@ public class AgentTaskService {
      */
     @Transactional
     public AgentTaskResponse createTask(AgentTaskRequest request) {
+        if (request.getType() != TaskType.CODE_REVIEW) {
+            throw new IllegalArgumentException("Hiện tại chỉ hỗ trợ tác vụ CODE_REVIEW");
+        }
         // Bước 1: Lấy thông tin người dùng đang thực hiện request từ Spring Security Context
         User currentUser = getCurrentUser();
 
@@ -101,13 +104,14 @@ public class AgentTaskService {
             ObjectNode objectNode;
             if (finalInput != null && !finalInput.isBlank()) {
                 var tree = objectMapper.readTree(finalInput);
-                objectNode = tree.isObject() ? (ObjectNode) tree : objectMapper.createObjectNode();
+                if (tree == null || !tree.isObject()) throw new IllegalArgumentException("Input phải là đối tượng JSON");
+                objectNode = (ObjectNode) tree;
             } else {
                 objectNode = objectMapper.createObjectNode();
             }
 
             // Gắn danh sách công cụ được phép sử dụng vào JSON
-            if (request.getSelectedTools() != null && !request.getSelectedTools().isEmpty()) {
+            if (request.getSelectedTools() != null) {
                 var toolsArr = objectNode.putArray("selectedTools");
                 for (String t : request.getSelectedTools()) {
                     toolsArr.add(t);
@@ -123,7 +127,7 @@ public class AgentTaskService {
             }
             finalInput = objectMapper.writeValueAsString(objectNode);
         } catch (Exception e) {
-            log.warn("Không thể chuẩn hóa input JSON: {}", e.getMessage());
+            throw new IllegalArgumentException("Input phải là một đối tượng JSON hợp lệ", e);
         }
 
         // Bước 5: Khởi tạo bản ghi AgentTask ở trạng thái chờ xử lý (PENDING)
@@ -156,11 +160,11 @@ public class AgentTaskService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    agentTaskExecutor.executeTaskAsync(effectiveTaskId, effectiveProjectPath, effectiveInput, effectiveType);
+                    submitTask(effectiveTaskId, effectiveProjectPath, effectiveInput, effectiveType);
                 }
             });
         } else {
-            agentTaskExecutor.executeTaskAsync(effectiveTaskId, effectiveProjectPath, effectiveInput, effectiveType);
+            submitTask(effectiveTaskId, effectiveProjectPath, effectiveInput, effectiveType);
         }
 
         // Bước 8: Chuyển đổi sang Response DTO và trả về ngay lập tức cho Client
@@ -175,16 +179,11 @@ public class AgentTaskService {
         // Bước 1: Tìm task và xác thực quyền sở hữu
         AgentTask task = findTaskAndVerifyOwner(taskId);
 
-        // Bước 2: Kiểm tra ràng buộc trạng thái: không thể hủy nếu task đã hoàn thành hoặc đã lỗi
-        if (task.getStatus() == JobStatus.COMPLETED || task.getStatus() == JobStatus.ERROR) {
-            throw new IllegalStateException("Không thể hủy tác vụ đã ở trạng thái: " + task.getStatus());
+        if (task.getStatus() == JobStatus.CANCELLED) return toResponse(task);
+        if (agentTaskRepository.cancelActiveTask(taskId, LocalDateTime.now()) == 0) {
+            throw new IllegalStateException("Tác vụ đã kết thúc hoặc đã bị xóa");
         }
-
-        // Bước 3: Đánh dấu trạng thái CANCELLED và lưu thời điểm hủy
-        task.setStatus(JobStatus.CANCELLED);
-        task.setCompletedAt(LocalDateTime.now());
-        task.setErrorMessage("Tác vụ đã bị người dùng hủy theo yêu cầu.");
-        AgentTask saved = agentTaskRepository.save(task);
+        AgentTask saved = findTaskAndVerifyOwner(taskId);
 
         // Bước 4: Ghi nhật ký kiểm toán hành vi hủy
         if (auditLogService != null) {
@@ -229,11 +228,13 @@ public class AgentTaskService {
     @Transactional
     public AgentTaskResponse retryTask(Long taskId) {
         AgentTask task = findTaskAndVerifyOwner(taskId);
-        task.setStatus(JobStatus.PENDING);
-        task.setOutput(null);
-        task.setErrorMessage(null);
-        task.setCompletedAt(null);
-        AgentTask saved = agentTaskRepository.save(task);
+        if (task.getType() != TaskType.CODE_REVIEW) {
+            throw new IllegalArgumentException("Hiện tại chỉ hỗ trợ tác vụ CODE_REVIEW");
+        }
+        if (agentTaskRepository.resetForRetry(taskId) == 0) {
+            throw new IllegalStateException("Chỉ có thể chạy lại tác vụ đã kết thúc");
+        }
+        AgentTask saved = findTaskAndVerifyOwner(taskId);
 
         if (auditLogService != null) {
             auditLogService.log(getCurrentUser().getUsername(), "RETRY_TASK", "Thực thi lại tác vụ #" + taskId);
@@ -242,16 +243,26 @@ public class AgentTaskService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    agentTaskExecutor.executeTaskAsync(saved.getId(), saved.getProject().getPath(), saved.getInput(), saved.getType());
+                    submitTask(saved.getId(), saved.getProject().getPath(), saved.getInput(), saved.getType());
                 }
             });
         } else {
-            agentTaskExecutor.executeTaskAsync(saved.getId(), saved.getProject().getPath(), saved.getInput(), saved.getType());
+            submitTask(saved.getId(), saved.getProject().getPath(), saved.getInput(), saved.getType());
         }
         return toResponse(saved);
     }
 
 
+
+    private void submitTask(Long id, String path, String input, TaskType type) {
+        try {
+            agentTaskExecutor.executeTaskAsync(id, path, input, type);
+        } catch (org.springframework.core.task.TaskRejectedException e) {
+            agentTaskRepository.rejectPendingTask(id,
+                    "Hàng đợi xử lý đã đầy. Vui lòng chạy lại sau.", LocalDateTime.now());
+            log.warn("Không thể đưa task {} vào hàng đợi", id);
+        }
+    }
 
     /**
      * Lấy chi tiết task (kiểm tra quyền sở hữu).

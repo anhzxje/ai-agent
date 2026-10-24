@@ -14,7 +14,6 @@ import prj.anhzxje.aiagent.repository.AgentTaskRepository;
 import prj.anhzxje.aiagent.repository.ProjectRepository;
 import prj.anhzxje.aiagent.security.CustomUserDetails;
 
-import org.springframework.beans.factory.annotation.Value;
 import prj.anhzxje.aiagent.entity.ChatConversation;
 import prj.anhzxje.aiagent.repository.ChatConversationRepository;
 import prj.anhzxje.aiagent.repository.ChatMessageRepository;
@@ -35,8 +34,12 @@ public class ProjectService {
     private final ChatConversationRepository chatConversationRepository;
     private final ChatMessageRepository chatMessageRepository;
 
-    @Value("${agent.allowed-paths:#{T(java.util.Collections).emptyList()}}")
-    private List<String> allowedPaths;
+    private List<String> allowedPaths = List.of();
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void configureAgentPaths(prj.anhzxje.aiagent.config.AgentProperties properties) {
+        this.allowedPaths = properties.getAllowedPaths();
+    }
 
     /**
      * Lấy danh sách toàn bộ project thuộc quyền sở hữu của người dùng đang đăng nhập.
@@ -97,7 +100,7 @@ public class ProjectService {
         }
 
         // Kiểm tra an toàn Sandbox
-        validateSandboxPath(dirPath, rawPath);
+        dirPath = prj.anhzxje.aiagent.security.ProjectPathPolicy.requireAllowedDirectory(rawPath, allowedPaths);
 
         // Kiểm tra trùng lặp tên dự án
         String trimmedName = request.getName() != null ? request.getName().trim() : "";
@@ -156,7 +159,7 @@ public class ProjectService {
             throw new IllegalArgumentException("Đường dẫn cung cấp không phải là một thư mục: " + rawPath);
         }
 
-        validateSandboxPath(dirPath, rawPath);
+        dirPath = prj.anhzxje.aiagent.security.ProjectPathPolicy.requireAllowedDirectory(rawPath, allowedPaths);
 
         String trimmedName = request.getName() != null ? request.getName().trim() : "";
         if (trimmedName.isBlank()) {
@@ -213,25 +216,6 @@ public class ProjectService {
                 projectId, tasks.size(), convs.size());
     }
 
-    private void validateSandboxPath(Path dirPath, String rawPath) {
-        if (allowedPaths == null || allowedPaths.isEmpty()) {
-            return;
-        }
-        boolean allowed = false;
-        for (String allowedPrefix : allowedPaths) {
-            try {
-                Path normAllowed = Path.of(allowedPrefix).toAbsolutePath().normalize();
-                if (dirPath.startsWith(normAllowed) || dirPath.equals(normAllowed)) {
-                    allowed = true;
-                    break;
-                }
-            } catch (Exception ignored) {}
-        }
-        if (!allowed) {
-            throw new SecurityException("Đường dẫn thư mục dự án '" + rawPath +
-                    "' không nằm trong danh mục thư mục được cấp phép (Sandbox): " + allowedPaths);
-        }
-    }
 
     // ────────────────────────────────────────────────
     // Phương thức phụ trợ (Helpers)

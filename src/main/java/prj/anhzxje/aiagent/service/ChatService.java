@@ -221,17 +221,15 @@ public class ChatService {
             if (conv.getProject() == null && request.getProjectId() != null) {
                 projectRepository.findById(request.getProjectId())
                         .filter(p -> p.getUser().getId().equals(user.getId()))
-                        .ifPresent(p -> {
-                            conv.setProject(p);
-                            conversationRepository.save(conv);
-                        });
+                        .map(p -> { conv.setProject(p); return p; })
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dự án với id: " + request.getProjectId()));
             }
         } else {
             Project proj = null;
             if (request.getProjectId() != null) {
                 proj = projectRepository.findById(request.getProjectId())
                         .filter(p -> p.getUser().getId().equals(user.getId()))
-                        .orElse(null);
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dự án với id: " + request.getProjectId()));
             }
             String initialTitle = generateConversationTitle(request.getMessage(), proj);
 
@@ -253,7 +251,8 @@ public class ChatService {
         }
 
         // Bước 2: Lấy lịch sử tin nhắn trước đó để giữ ngữ cảnh hội thoại đa lượt
-        List<ChatMessage> previousMessages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conv.getId());
+        List<ChatMessage> previousMessages = new java.util.ArrayList<>(messageRepository.findTop10ByConversationIdOrderByCreatedAtDescIdDesc(conv.getId()));
+        java.util.Collections.reverse(previousMessages);
 
         // Bước 3: Lưu tin nhắn của Người dùng (USER) vào CSDL
         ChatMessage userMsg = ChatMessage.builder()

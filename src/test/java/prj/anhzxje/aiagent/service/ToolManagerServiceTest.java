@@ -43,6 +43,7 @@ class ToolManagerServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(toolManagerService, "allowedPaths", List.of(System.getProperty("user.dir")));
         listDirTool = AgentToolConfig.builder()
                 .id(1L)
                 .toolName("list_directory")
@@ -98,7 +99,7 @@ class ToolManagerServiceTest {
         when(toolConfigRepository.findByEnabledTrue()).thenReturn(List.of(listDirTool));
 
         // Người dùng yêu cầu cả list_directory VÀ grep
-        List<Object> tools = toolManagerService.resolveActiveTools(List.of("list_directory", "grep"));
+        List<Object> tools = toolManagerService.resolveActiveTools(List.of("list_directory", "grep"), System.getProperty("user.dir"));
 
         // Chỉ có list_directory được cấp phép, grep bị loại bỏ
         assertEquals(1, tools.size());
@@ -132,6 +133,6 @@ class ToolManagerServiceTest {
                 List.of(System.getProperty("user.dir")));
 
         assertThrows(SecurityException.class, () ->
-                toolManagerService.resolveActiveTools(List.of("list_directory"), System.getProperty("user.dir") + "/../../sensitive"));
+                toolManagerService.resolveActiveTools(List.of("list_directory"), java.nio.file.Path.of(System.getProperty("user.dir")).getParent().toString()));
     }
 }

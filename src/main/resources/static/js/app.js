@@ -1464,7 +1464,7 @@
             projectName: project ? project.name : "Dự án",
             type: type,
             input: { projectPath: project ? project.path : "D:/AI Agent/aiagent/aiagent", focus: focus },
-            selectedTools: selectedTools.length > 0 ? selectedTools : undefined,
+            selectedTools: selectedTools,
             model: model || undefined,
             prompt: prompt || undefined
           });
