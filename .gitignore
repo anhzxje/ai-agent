@@ -38,3 +38,5 @@ build/
 .env.*
 application-local.yml
 application-local.properties
+
+.archify/
