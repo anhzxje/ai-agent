@@ -40,3 +40,30 @@ jobs:
 
       - name: Run frontend tests
         run: node --test src/test/js/frontend.test.cjs
+
+      - name: Verify Docker image builds
+        run: docker build --tag aiagent:ci .
+
+      - name: Smoke test Docker Compose stack
+        env:
+          DB_ROOT_PASSWORD: ci-root-password
+          DB_USERNAME: ci_user
+          DB_PASSWORD: ci-app-password
+          GOOGLE_API_KEY: ci-placeholder-key
+          JWT_SECRET: Y2ktdGVzdC1qd3Qtc2VjcmV0LWtleS0zMi1ieXRlcy1sb25nIQ==
+          ADMIN_INITIAL_PASSWORD: ci-admin-password
+        run: |
+          docker compose up --detach --build
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:8080/ > /dev/null; then
+              echo "Compose app is responding."
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose logs
+          exit 1
+
+      - name: Stop Docker Compose stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
