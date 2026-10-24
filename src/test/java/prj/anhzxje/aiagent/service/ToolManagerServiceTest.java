@@ -3,6 +3,7 @@ package prj.anhzxje.aiagent.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -11,6 +12,8 @@ import prj.anhzxje.aiagent.entity.AgentToolConfig;
 import prj.anhzxje.aiagent.exception.ResourceNotFoundException;
 import prj.anhzxje.aiagent.repository.AgentToolConfigRepository;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +40,9 @@ class ToolManagerServiceTest {
 
     @InjectMocks
     private ToolManagerService toolManagerService;
+
+    @TempDir
+    private Path tempDir;
 
     private AgentToolConfig listDirTool;
     private AgentToolConfig grepTool;
@@ -119,20 +125,23 @@ class ToolManagerServiceTest {
     }
 
     @Test
-    void testResolveActiveTools_WithDisallowedSandboxPath_ThrowsSecurityException() {
+    void testResolveActiveTools_WithDisallowedSandboxPath_ThrowsSecurityException() throws Exception {
+        Path allowedDir = Files.createDirectories(tempDir.resolve("allowed"));
+        Path disallowedDir = Files.createDirectories(tempDir.resolve("disallowed"));
         org.springframework.test.util.ReflectionTestUtils.setField(toolManagerService, "allowedPaths",
-                List.of(System.getProperty("user.dir")));
+                List.of(allowedDir.toString()));
 
         assertThrows(SecurityException.class, () ->
-                toolManagerService.resolveActiveTools(List.of("list_directory"), "C:/Windows/System32"));
+                toolManagerService.resolveActiveTools(List.of("list_directory"), disallowedDir.toString()));
     }
 
     @Test
-    void testResolveActiveTools_WithPathTraversal_ThrowsSecurityException() {
+    void testResolveActiveTools_WithPathTraversal_ThrowsSecurityException() throws Exception {
+        Path allowedDir = Files.createDirectories(tempDir.resolve("parent").resolve("allowed"));
         org.springframework.test.util.ReflectionTestUtils.setField(toolManagerService, "allowedPaths",
-                List.of(System.getProperty("user.dir")));
+                List.of(allowedDir.toString()));
 
         assertThrows(SecurityException.class, () ->
-                toolManagerService.resolveActiveTools(List.of("list_directory"), java.nio.file.Path.of(System.getProperty("user.dir")).getParent().toString()));
+                toolManagerService.resolveActiveTools(List.of("list_directory"), allowedDir.getParent().toString()));
     }
 }
