@@ -24,7 +24,7 @@
   1. `gemini-3.5-flash-lite` (Mặc định - Phản hồi siêu tốc, tiết kiệm token, tối ưu hội thoại)
   2. `gemini-2.5-flash` (Lập luận sâu, phân tích cấu trúc mã nguồn toàn diện)
   3. `gemini-2.5-pro` (Phân tích chuyên sâu cho các bài toán kiến trúc phức tạp)
-  4. `gemini-1.5-flash` & `gemini-1.5-pro` (Tương thích ngược)
+
 - **Bảo mật**: Spring Security 6, JJWT (JSON Web Token), BCrypt Password Encoder, Strict Path Normalization (Anti Path Traversal Sandbox).
 - **Cơ sở dữ liệu**: MySQL 8.x với hỗ trợ kiểu dữ liệu JSON (`SqlTypes.JSON`), kiểm tra ping kết nối và đo độ trễ trực tiếp.
 - **Giao diện Web Modular (Vanilla JavaScript ES6+)**:
