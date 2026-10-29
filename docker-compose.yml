@@ -1,10 +1,7 @@
-version: '3.8'
-
 services:
   # 1. MySQL Database Container
   mysql:
     image: mysql:8.0
-    container_name: aiagent_mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
@@ -26,7 +23,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: aiagent_app
     restart: always
     ports:
       - "8080:8080"
@@ -42,6 +38,12 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     volumes:
       # Mount thư mục local vào container để AI Agent đọc mã nguồn (Tùy chỉnh theo máy bạn bè)
       - ./:/workspace:ro

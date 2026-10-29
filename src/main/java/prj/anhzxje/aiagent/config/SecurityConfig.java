@@ -64,7 +64,7 @@ public class SecurityConfig {
                     .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                     // Public endpoints: Đăng nhập, đăng ký, cấu hình công khai và tài nguyên tĩnh giao diện
-                    .requestMatchers("/api/auth/**", "/api/system/**").permitAll()
+                    .requestMatchers("/api/auth/**", "/api/system/**", "/actuator/health").permitAll()
                     .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/assets/**", "/favicon.ico").permitAll()
                     // Mọi request nghiệp vụ khác bắt buộc phải có JWT Token hợp lệ
                     .anyRequest().authenticated())
