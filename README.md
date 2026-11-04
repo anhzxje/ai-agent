@@ -16,6 +16,19 @@
 
 ---
 
+## 📖 Hệ thống Tài liệu Kỹ thuật Chi tiết (Documentation)
+
+Bộ tài liệu kỹ thuật hoàn chỉnh của dự án được lưu trữ trong thư mục [`docs/`](docs/):
+
+- 🏛️ [**Kiến trúc Hệ thống (docs/ARCHITECTURE.md)**](docs/ARCHITECTURE.md): Phân tích kiến trúc đa tầng, vòng lặp AI Agent Tool Calling, cơ chế Sandbox, sơ đồ ERD và Sequence Diagrams.
+- 📡 [**Đặc tả RESTful API (docs/API_SPECIFICATION.md)**](docs/API_SPECIFICATION.md): Hướng dẫn đầy đủ 7 nhóm REST API, schemas, headers, status codes và cURL examples.
+- 🚀 [**Hướng dẫn Triển khai & Vận hành (docs/DEPLOYMENT_GUIDE.md)**](docs/DEPLOYMENT_GUIDE.md): Cài đặt Local, Docker Compose, bảo mật Production, biến môi trường và khắc phục sự cố.
+- 🛠️ [**Hướng dẫn Lập trình viên (docs/DEVELOPER_GUIDE.md)**](docs/DEVELOPER_GUIDE.md): Hướng dẫn setup IDE, cách thêm Tool mới, TaskType mới, Model mới và viết test tự động.
+- 📋 [**Quy chuẩn Đóng góp (CONTRIBUTING.md)**](CONTRIBUTING.md): Git Flow, chuẩn Conventional Commits và checklist Pull Request.
+- 📑 [**Bản ghi Quyết định Kiến trúc (docs/decisions/)**](docs/decisions/): Các ADRs giải thích nguyên nhân và bối cảnh các quyết định công nghệ quan trọng (Java 21, Spring AI, Sandbox, Vanilla JS).
+
+---
+
 ## 2. Kiến trúc & Công nghệ Thực tế
 
 ### Công nghệ sử dụng
