@@ -1,0 +1,53 @@
+[
+  {
+    "id": "security-review",
+    "version": "1.0.0",
+    "description": "Rà soát bảo mật dựa trên luồng dữ liệu và bằng chứng mã nguồn.",
+    "languages": [
+      "*"
+    ],
+    "conflictsWith": [],
+    "resource": "security-review.md"
+  },
+  {
+    "id": "performance-review",
+    "version": "1.0.0",
+    "description": "Rà soát hiệu năng; phân biệt rủi ro tĩnh với kết quả benchmark.",
+    "languages": [
+      "*"
+    ],
+    "conflictsWith": [],
+    "resource": "performance-review.md"
+  },
+  {
+    "id": "code-quality-review",
+    "version": "1.0.0",
+    "description": "Đánh giá khả năng bảo trì và lỗi xử lý ngoại lệ có bằng chứng.",
+    "languages": [
+      "*"
+    ],
+    "conflictsWith": [],
+    "resource": "code-quality-review.md"
+  },
+  {
+    "id": "spring-boot-review",
+    "version": "1.0.0",
+    "description": "Rà soát ứng dụng Java/Kotlin Spring Boot theo phiên bản và cấu hình thực tế.",
+    "languages": [
+      "Java",
+      "Kotlin"
+    ],
+    "conflictsWith": [],
+    "resource": "spring-boot-review.md"
+  },
+  {
+    "id": "architecture-review",
+    "version": "1.0.0",
+    "description": "Đánh giá ranh giới và hướng phụ thuộc với context nhiều module.",
+    "languages": [
+      "*"
+    ],
+    "conflictsWith": [],
+    "resource": "architecture-review.md"
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "status": "COMPLETED",
+  "rawOutput": "{\"schemaVersion\": 2, \"summary\": \"Synthetic evaluator fixture; not a model result.\", \"issues\": [{\"classification\": \"CONFIRMED_BUG\", \"severity\": \"MEDIUM\", \"category\": \"BUG\", \"filePath\": \"src/main/java/fixture/booking/BookingController.java\", \"lineStart\": 12, \"lineEnd\": 12, \"evidence\": \"if (position < 0 || position > store.size()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);\", \"explanation\": \"Index equal to collection size passes the range check.\", \"suggestion\": \"Apply the correction described in the annotation verification contract.\"}, {\"classification\": \"CONFIRMED_BUG\", \"severity\": \"MEDIUM\", \"category\": \"BUG\", \"filePath\": \"src/main/java/fixture/booking/BookingStore.java\", \"lineStart\": 15, \"lineEnd\": 15, \"evidence\": \"states.put(number, \\\"CONFIRMED\\\");\", \"explanation\": \"Cancellation writes CONFIRMED instead of CANCELLED.\", \"suggestion\": \"Apply the correction described in the annotation verification contract.\"}, {\"classification\": \"CONFIRMED_BUG\", \"severity\": \"MEDIUM\", \"category\": \"BUG\", \"filePath\": \"src/main/java/fixture/booking/BookingController.java\", \"lineStart\": 12, \"lineEnd\": 12, \"evidence\": \"if (position < 0 || position > store.size()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);\", \"explanation\": \"Index equal to collection size passes the range check.\", \"suggestion\": \"Apply the correction described in the annotation verification contract.\"}], \"suggestions\": [], \"limitations\": [\"Synthetic report for scoring tests only.\"]}",
+  "observations": [
+    {
+      "filePath": "src/main/java/fixture/booking/BookingStore.java",
+      "lineStart": 1,
+      "lineEnd": 25
+    },
+    {
+      "filePath": "src/main/java/fixture/booking/BookingController.java",
+      "lineStart": 1,
+      "lineEnd": 21
+    },
+    {
+      "filePath": "src/main/java/fixture/booking/AccessConfiguration.java",
+      "lineStart": 1,
+      "lineEnd": 10
+    }
+  ],
+  "usage": null,
+  "generationLatencyMs": null,
+  "errorCode": null,
+  "provenance": "SYNTHETIC_FIXTURE"
+}

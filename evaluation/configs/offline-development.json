@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "dataset": "datasets/development.json",
+  "mode": "OFFLINE_REPLAY",
+  "provider": "google-genai",
+  "model": "gemini-3.5-flash-lite",
+  "modelOptions": {
+    "temperature": 0.0
+  },
+  "tools": [
+    "list_directory",
+    "glob",
+    "file_system",
+    "grep"
+  ],
+  "skills": [
+    {
+      "id": "security-review",
+      "version": "1.0.0"
+    },
+    {
+      "id": "performance-review",
+      "version": "1.0.0"
+    },
+    {
+      "id": "code-quality-review",
+      "version": "1.0.0"
+    }
+  ],
+  "limits": {
+    "maxCases": 2,
+    "maxRequestsPerCase": 25,
+    "maxTotalRequests": 100,
+    "maxModelCalls": 25,
+    "maxToolCalls": 24,
+    "maxTotalToolCalls": 96,
+    "maxPromptChars": 24000,
+    "maxContextChars": 96000,
+    "maxSkillChars": 8000,
+    "maxSkills": 3,
+    "concurrency": 1,
+    "retries": 0,
+    "maxOutputTokens": 4096
+  },
+  "replays": {
+    "inventory-api:R0": "replays/inventory-api-R0.json",
+    "inventory-api:R1": "replays/inventory-api-R1.json",
+    "directory-api:R0": "replays/directory-api-R0.json",
+    "directory-api:R1": "replays/directory-api-R1.json"
+  },
+  "adjudications": null,
+  "storeRawFindings": true
+}

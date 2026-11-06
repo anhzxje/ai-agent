@@ -85,7 +85,8 @@
             <div class="welcome-project-desc">${escapeHtml(proj.description || 'Thư mục dự án mã nguồn đã sẵn sàng tương tác cùng AI.')}</div>
           </div>
           <div class="welcome-project-footer">
-            <span style="font-size: 11.5px; color: var(--text-muted);">Antigravity Workspace</span>
+            <button type="button" class="btn-nav-secondary" data-project-review="${escapeHtml(proj.id)}">Code Review</button>
+            <span style="font-size: 11.5px; color: var(--text-muted);">Project workspace</span>
             <button class="btn-open-workspace" data-btn-open-proj="${proj.id}">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -109,7 +110,8 @@
     });
 
     container.querySelectorAll(".welcome-project-card").forEach(card => {
-      card.addEventListener("click", () => {
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("[data-project-review]")) return;
         const projId = Number(card.getAttribute("data-welcome-proj-id"));
         const proj = state.projects.find(p => p.id === projId);
         if (proj && typeof selectProjectWorkspaceFn === "function") {
@@ -465,11 +467,14 @@
       return;
     }
 
+    const session = apiClient.getToken?.();
     try {
       await apiClient.deleteProject(numId);
     } catch (e) {
-      console.warn("Lỗi API khi xóa dự án:", e);
+      if (session === apiClient.getToken?.()) window.WorkspaceView?.notify(e.message || 'Không thể xóa dự án', true);
+      return;
     }
+    if (session !== apiClient.getToken?.()) return;
 
     state.projects = state.projects.filter(p => Number(p.id) !== numId);
     state.conversations = state.conversations.filter(c => Number(c.projectId) !== numId);
@@ -492,7 +497,50 @@
     populateProjectSelect(state, el);
   }
 
+  function mount({el, state, closeModals, loadDatabaseData, selectProjectWorkspace, signal}) {
+    function listen(target, type, handler) { target.addEventListener(type, handler, {signal}); }
+
+    // Path suggestions pills in Open Project modal
+    document.querySelectorAll(".path-pill-btn[data-fill]").forEach(pill => {
+      listen(pill, "click", () => {
+        const inp = document.getElementById("inputProjectPath");
+        if (inp) inp.value = pill.getAttribute("data-fill");
+      });
+    });
+
+    // Submit: Open Project (Lưu vào CSDL)
+    if (el.formOpenProject) {
+      listen(el.formOpenProject, "submit", async (e) => {
+        e.preventDefault();
+        const path = document.getElementById("inputProjectPath").value.trim();
+        const name = document.getElementById("inputProjectName").value.trim();
+        const language = document.getElementById("inputProjectLang") ? document.getElementById("inputProjectLang").value.trim() : "Java";
+        const description = document.getElementById("inputProjectDesc") ? document.getElementById("inputProjectDesc").value.trim() : "";
+
+        if (state.projects.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+          window.WorkspaceView.formError(el.formOpenProject, `Dự án "${name}" đã tồn tại. Hãy chọn tên khác.`);
+          return;
+        }
+
+        const session = window.apiClient.getToken?.();
+        const isCurrent = () => session === window.apiClient.getToken?.();
+        try {
+          const newProj = await window.apiClient.createProject({ name, path, language, description });
+          if (!isCurrent()) return;
+          closeModals();
+          await loadDatabaseData();
+          if (isCurrent()) selectProjectWorkspace(newProj);
+        } catch (err) {
+          if (!isCurrent()) return;
+          window.WorkspaceView.formError(el.formOpenProject, "Không tạo được dự án: " + err.message);
+        }
+      });
+    }
+
+  }
+
   window.ProjectView = {
+    mount,
     formatRelativeTime,
     renderWelcomeProjects,
     renderSidebar,

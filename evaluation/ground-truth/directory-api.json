@@ -1,0 +1,94 @@
+[
+  {
+    "defectId": "directory-api-01",
+    "fixtureId": "directory-api",
+    "sourceRevision": "463df859b6ccb6554e044e6c440f3190d49133c41ce42811b9c89001406fb15e",
+    "family": "parameterized-query",
+    "category": "SECURITY",
+    "severity": "HIGH",
+    "classification": "NON_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/directory/DirectoryController.java",
+        "lineStart": 13,
+        "lineEnd": 13,
+        "evidence": "Object search(@RequestParam String name) { return jdbc.queryForList(\"SELECT id FROM accounts WHERE name = ?\", name); }"
+      }
+    ],
+    "rootCause": "Search binds untrusted input as a JDBC parameter.",
+    "triggerCondition": "Input contains SQL-looking text.",
+    "expectedImpact": "Input remains data rather than changing SQL structure.",
+    "counterevidence": "The SQL literal contains a placeholder and the value is supplied separately.",
+    "verificationProcedure": "Use a seeded disposable database and quote/OR input; unrelated rows must not be returned.",
+    "rationale": "Search binds untrusted input as a JDBC parameter. The SQL literal contains a placeholder and the value is supplied separately."
+  },
+  {
+    "defectId": "directory-api-02",
+    "fixtureId": "directory-api",
+    "sourceRevision": "463df859b6ccb6554e044e6c440f3190d49133c41ce42811b9c89001406fb15e",
+    "family": "correct-authorization",
+    "category": "SECURITY",
+    "severity": "HIGH",
+    "classification": "NON_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/directory/DirectoryController.java",
+        "lineStart": 15,
+        "lineEnd": 15,
+        "evidence": "Object account(@PathVariable long id, Principal principal) { return jdbc.queryForMap(\"SELECT id FROM accounts WHERE id = ? AND owner = ?\", id, principal.getName()); }"
+      }
+    ],
+    "rootCause": "Account query constrains both ID and authenticated owner.",
+    "triggerCondition": "User A supplies user B account ID.",
+    "expectedImpact": "Another owner account cannot match the query.",
+    "counterevidence": "Authentication is enforced separately and principal comes from Spring Security.",
+    "verificationProcedure": "Authenticate A against a seeded two-owner DB; B account should not be returned.",
+    "rationale": "Account query constrains both ID and authenticated owner. Authentication is enforced separately and principal comes from Spring Security."
+  },
+  {
+    "defectId": "directory-api-03",
+    "fixtureId": "directory-api",
+    "sourceRevision": "463df859b6ccb6554e044e6c440f3190d49133c41ce42811b9c89001406fb15e",
+    "family": "input-validation",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "NON_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/directory/DirectoryController.java",
+        "lineStart": 18,
+        "lineEnd": 18,
+        "evidence": "int quantity(@Valid @RequestBody Quantity quantity) { return quantity.value(); }"
+      }
+    ],
+    "rootCause": "Request DTO validation is activated with Valid and a minimum constraint.",
+    "triggerCondition": "POST quantity with value=0 or negative.",
+    "expectedImpact": "Invalid quantity is rejected before controller logic.",
+    "counterevidence": "Min constraint is on the DTO component, not on an unchecked local variable.",
+    "verificationProcedure": "Send invalid JSON quantity through Spring MVC with validation; expect HTTP 400.",
+    "rationale": "Request DTO validation is activated with Valid and a minimum constraint. Min constraint is on the DTO component, not on an unchecked local variable."
+  },
+  {
+    "defectId": "directory-api-04",
+    "fixtureId": "directory-api",
+    "sourceRevision": "463df859b6ccb6554e044e6c440f3190d49133c41ce42811b9c89001406fb15e",
+    "family": "resource-cleanup",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "NON_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/directory/DirectoryController.java",
+        "lineStart": 20,
+        "lineEnd": 20,
+        "evidence": "try (var lines = Files.lines(path)) { return lines.count(); }"
+      }
+    ],
+    "rootCause": "Try-with-resources closes the Files.lines stream.",
+    "triggerCondition": "Normal completion or an exception during stream processing.",
+    "expectedImpact": "Descriptor is closed deterministically.",
+    "counterevidence": "Terminal count is enclosed by the resource scope.",
+    "verificationProcedure": "Verify close under success and exceptional terminal operation with a close-tracking stream.",
+    "rationale": "Try-with-resources closes the Files.lines stream. Terminal count is enclosed by the resource scope."
+  }
+]

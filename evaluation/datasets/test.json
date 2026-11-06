@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "version": "1.0.0",
+  "split": "test",
+  "fixtures": [
+    {
+      "fixtureId": "booking-api",
+      "path": "fixtures/booking-api",
+      "sourceHash": "8016c5e823edb896534482780b492e3ca73dc411098e3abf69fe976bfde74cbe",
+      "groundTruth": "ground-truth/booking-api.json"
+    },
+    {
+      "fixtureId": "ledger-api",
+      "path": "fixtures/ledger-api",
+      "sourceHash": "ea785546a4034ca0cacf949fd0d137d47a4f27ae14e9e449520be26d8f498e2b",
+      "groundTruth": "ground-truth/ledger-api.json"
+    }
+  ],
+  "groundTruthSchemaVersion": 1
+}

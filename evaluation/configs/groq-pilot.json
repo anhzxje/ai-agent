@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "dataset": "datasets/groq-pilot.json",
+  "mode": "REAL_LLM",
+  "provider": "groq",
+  "model": "openai/gpt-oss-120b",
+  "modelOptions": {
+    "temperature": 0.0
+  },
+  "tools": [
+    "list_directory",
+    "glob",
+    "file_system",
+    "grep"
+  ],
+  "skills": [
+    {
+      "id": "security-review",
+      "version": "1.0.0"
+    },
+    {
+      "id": "performance-review",
+      "version": "1.0.0"
+    },
+    {
+      "id": "code-quality-review",
+      "version": "1.0.0"
+    }
+  ],
+  "limits": {
+    "maxCases": 1,
+    "maxRequestsPerCase": 5,
+    "maxTotalRequests": 10,
+    "maxModelCalls": 5,
+    "maxToolCalls": 8,
+    "maxTotalToolCalls": 16,
+    "maxPromptChars": 12000,
+    "maxContextChars": 24000,
+    "maxSkillChars": 8000,
+    "maxSkills": 3,
+    "concurrency": 1,
+    "retries": 0,
+    "maxOutputTokens": 1024
+  },
+  "replays": null,
+  "adjudications": null,
+  "storeRawFindings": true
+}

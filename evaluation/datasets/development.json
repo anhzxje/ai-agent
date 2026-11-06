@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "version": "1.0.0",
+  "split": "development",
+  "fixtures": [
+    {
+      "fixtureId": "inventory-api",
+      "path": "fixtures/inventory-api",
+      "sourceHash": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+      "groundTruth": "ground-truth/inventory-api.json"
+    },
+    {
+      "fixtureId": "directory-api",
+      "path": "fixtures/directory-api",
+      "sourceHash": "463df859b6ccb6554e044e6c440f3190d49133c41ce42811b9c89001406fb15e",
+      "groundTruth": "ground-truth/directory-api.json"
+    }
+  ],
+  "groundTruthSchemaVersion": 1
+}

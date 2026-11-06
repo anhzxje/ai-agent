@@ -1,0 +1,48 @@
+[
+  {
+    "defectId": "ledger-api-01",
+    "fixtureId": "ledger-api",
+    "sourceRevision": "ea785546a4034ca0cacf949fd0d137d47a4f27ae14e9e449520be26d8f498e2b",
+    "family": "safe-concurrency",
+    "category": "BUG",
+    "severity": "HIGH",
+    "classification": "NON_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/ledger/Ledger.java",
+        "lineStart": 10,
+        "lineEnd": 10,
+        "evidence": "synchronized boolean debit(long amount) {"
+      }
+    ],
+    "rootCause": "All balance reads and updates use the same object monitor.",
+    "triggerCondition": "Concurrent credit, debit and balance calls on one Ledger instance.",
+    "expectedImpact": "No lost update or check-then-act race within these operations.",
+    "counterevidence": "Credit, debit and balance are synchronized; synchronized itself is not a defect.",
+    "verificationProcedure": "Run bounded concurrent operations and check invariants; do not infer races from a keyword.",
+    "rationale": "All balance reads and updates use the same object monitor. Credit, debit and balance are synchronized; synchronized itself is not a defect."
+  },
+  {
+    "defectId": "ledger-api-02",
+    "fixtureId": "ledger-api",
+    "sourceRevision": "ea785546a4034ca0cacf949fd0d137d47a4f27ae14e9e449520be26d8f498e2b",
+    "family": "input-validation",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "NON_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/ledger/LedgerController.java",
+        "lineStart": 11,
+        "lineEnd": 11,
+        "evidence": "if (amount < 1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);"
+      }
+    ],
+    "rootCause": "Controller rejects nonpositive credit and domain service also guards bounds.",
+    "triggerCondition": "Credit request amount is zero or negative.",
+    "expectedImpact": "Controlled bad request before state update.",
+    "counterevidence": "Ledger has additional positive-value and overflow guards.",
+    "verificationProcedure": "Invoke credit(0) through MVC and assert HTTP 400 with unchanged balance.",
+    "rationale": "Controller rejects nonpositive credit and domain service also guards bounds. Ledger has additional positive-value and overflow guards."
+  }
+]
