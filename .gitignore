@@ -44,3 +44,9 @@ application-local.properties
 
 ### Python architecture checks ###
 __pycache__/
+
+### Local reports and planning documents ###
+/docs/
+/tasks/
+/BaoCao_AI_Agent.tex
+/CONTRIBUTING.md
