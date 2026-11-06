@@ -74,7 +74,7 @@ jobs:
           node-version: '22'
 
       - name: Run all frontend tests
-        run: node --test
+        run: node --test src/test/js/*.test.cjs
 
       - name: Run offline browser regression
         env:
