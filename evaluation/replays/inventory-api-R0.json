@@ -1,0 +1,25 @@
+{
+  "status": "COMPLETED",
+  "rawOutput": "{\"schemaVersion\": 2, \"summary\": \"Synthetic evaluator fixture; not a model result.\", \"issues\": [{\"classification\": \"CONFIRMED_BUG\", \"severity\": \"HIGH\", \"category\": \"SECURITY\", \"filePath\": \"src/main/java/fixture/inventory/InventoryStore.java\", \"lineStart\": 11, \"lineEnd\": 11, \"evidence\": \"Object search(String name) { return jdbc.queryForList(\\\"SELECT id FROM accounts WHERE name = '\\\" + name + \\\"'\\\"); }\", \"explanation\": \"Untrusted name is concatenated into SQL before execution.\", \"suggestion\": \"Apply the correction described in the annotation verification contract.\"}], \"suggestions\": [], \"limitations\": [\"Synthetic report for scoring tests only.\"]}",
+  "observations": [
+    {
+      "filePath": "src/main/java/fixture/inventory/AccessConfiguration.java",
+      "lineStart": 1,
+      "lineEnd": 10
+    },
+    {
+      "filePath": "src/main/java/fixture/inventory/InventoryController.java",
+      "lineStart": 1,
+      "lineEnd": 30
+    },
+    {
+      "filePath": "src/main/java/fixture/inventory/InventoryStore.java",
+      "lineStart": 1,
+      "lineEnd": 30
+    }
+  ],
+  "usage": null,
+  "generationLatencyMs": null,
+  "errorCode": null,
+  "provenance": "SYNTHETIC_FIXTURE"
+}

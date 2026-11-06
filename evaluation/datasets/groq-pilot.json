@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "version": "1.0.0",
+  "split": "development",
+  "fixtures": [
+    {
+      "fixtureId": "inventory-api",
+      "path": "fixtures/inventory-api",
+      "sourceHash": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+      "groundTruth": "ground-truth/inventory-api.json"
+    }
+  ],
+  "groundTruthSchemaVersion": 1
+}

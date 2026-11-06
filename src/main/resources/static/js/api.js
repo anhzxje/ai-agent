@@ -107,6 +107,22 @@ class AgentApiClient {
     return false;
   }
 
+  async loginLocalAdmin() {
+    const res = await fetch(`${this.baseUrl}/api/auth/local-admin`, {
+      method: "POST",
+      headers: { "X-Local-Quick-Login": "1" },
+      signal: AbortSignal.timeout(10000)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.token) {
+      throw new Error(data.message || "Đăng nhập nhanh chưa được bật trên máy chủ này.");
+    }
+    this.setToken(data.token);
+    this.setCurrentUser({ username: data.username, role: data.role });
+    this.isBackendOnline = true;
+    return data;
+  }
+
   async login(username, password) {
     const urls = [this.baseUrl, "http://localhost:8080"];
     const unique = [...new Set(urls.filter(Boolean))];
@@ -196,7 +212,8 @@ class AgentApiClient {
     localStorage.removeItem(this.userKey);
   }
 
-  async getProjects() {
+  async getProjects({signal} = {}) {
+    const session = this.getToken();
     if (!this.getCurrentUser() || !this.getToken()) {
       return [];
     }
@@ -207,19 +224,22 @@ class AgentApiClient {
     try {
       const res = await fetch(`${this.baseUrl}/api/projects`, {
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(5000)
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000)
       });
       if (res.ok) {
         this.isBackendOnline = true;
         return await res.json();
       }
       if (res.status === 401 || res.status === 403) {
-        this.logout();
+        if (session === this.getToken()) this.logout();
         return [];
       }
+      throw new Error(`Không tải được dự án (HTTP ${res.status})`);
     } catch (e) {
+      if (signal?.aborted) throw e;
       this.isBackendOnline = false;
       console.warn("Không thể tải danh sách dự án từ máy chủ:", e.message);
+      if (!this.isExplicitDemoMode) throw e;
     }
     return this.isExplicitDemoMode ? this.getUserLocalProjects() : [];
   }
@@ -304,7 +324,8 @@ class AgentApiClient {
     return newProj;
   }
 
-  async getTasks() {
+  async getTasks({signal} = {}) {
+    const session = this.getToken();
     if (!this.getCurrentUser() || !this.getToken()) {
       return [];
     }
@@ -312,7 +333,7 @@ class AgentApiClient {
     try {
       const res = await fetch(`${this.baseUrl}/api/tasks`, {
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(5000)
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000)
       });
       if (res.ok) {
         this.isBackendOnline = true;
@@ -320,13 +341,15 @@ class AgentApiClient {
         return Array.isArray(tasks) ? tasks : [];
       }
       if (res.status === 401 || res.status === 403) {
-        this.logout();
+        if (session === this.getToken()) this.logout();
         return [];
       }
-      console.warn(`GET /api/tasks returned HTTP ${res.status}`);
+      throw new Error(`Không tải được tác vụ (HTTP ${res.status})`);
     } catch (e) {
+      if (signal?.aborted) throw e;
       this.isBackendOnline = false;
       console.warn("Lỗi khi kết nối GET /api/tasks:", e);
+      if (!this.isExplicitDemoMode) throw e;
     }
 
     if (this.isExplicitDemoMode) {
@@ -381,7 +404,16 @@ class AgentApiClient {
       throw new Error("Vui lòng đăng nhập trước khi tạo tác vụ AI");
     }
 
-    const payload = { ...taskData };
+    // Only fields accepted by AgentTaskRequest; labels belong to the UI/response.
+    const payload = {
+      projectId: taskData.projectId,
+      type: taskData.type,
+      input: taskData.input,
+      selectedTools: taskData.selectedTools,
+      model: taskData.model,
+      prompt: taskData.prompt,
+      skills: taskData.skills
+    };
     if (payload.input && typeof payload.input === 'object') {
       payload.input = JSON.stringify(payload.input);
     }
@@ -560,6 +592,22 @@ class AgentApiClient {
     localStorage.setItem(key, JSON.stringify(list));
   }
 
+  // Strict reads for Control Center: a failed request must not look like an empty dataset.
+  async getAdminControlData(resource) {
+    if (!['stats', 'users', 'tools', 'settings', 'tasks', 'audit-logs'].includes(resource)) {
+      throw new Error('Unsupported admin resource');
+    }
+    const response = await fetch(`${this.baseUrl}/api/admin/${resource}`, {
+      headers: this.getHeaders(), signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) {
+      const error = new Error(`Admin request failed (HTTP ${response.status})`);
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  }
+
   async getAdminStats() {
     try {
       const res = await fetch(`${this.baseUrl}/api/admin/stats`, {
@@ -632,6 +680,54 @@ class AgentApiClient {
       console.warn("Could not fetch user projects for admin:", e);
     }
     return [];
+  }
+
+  async getUserConversationsForAdmin(userId) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/users/${userId}/conversations`, {
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(4000)
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Could not fetch user conversations for admin:", e);
+    }
+    return [];
+  }
+
+  async getConversationMessagesForAdmin(conversationId) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/conversations/${conversationId}/messages`, {
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(4000)
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Could not fetch conversation messages for admin:", e);
+    }
+    return [];
+  }
+
+  async deleteConversationForAdmin(conversationId) {
+    const res = await fetch(`${this.baseUrl}/api/admin/conversations/${conversationId}`, {
+      method: "DELETE",
+      headers: this.getHeaders(),
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) return await res.json().catch(() => ({ success: true }));
+    const err = await res.json().catch(() => ({ message: "Không thể xóa cuộc hội thoại" }));
+    throw new Error(err.message || `Lỗi HTTP ${res.status}`);
+  }
+
+  async deleteMessageForAdmin(messageId) {
+    const res = await fetch(`${this.baseUrl}/api/admin/messages/${messageId}`, {
+      method: "DELETE",
+      headers: this.getHeaders(),
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) return await res.json().catch(() => ({ success: true }));
+    const err = await res.json().catch(() => ({ message: "Không thể xóa tin nhắn" }));
+    throw new Error(err.message || `Lỗi HTTP ${res.status}`);
   }
 
   async updateUserStatus(userId, locked) {
@@ -865,7 +961,7 @@ class AgentApiClient {
       });
       if (res.ok) return await res.json();
     } catch (e) {}
-    return { activeModel: "gemini-3.5-flash-lite", allowedModels: ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash"] };
+    return { activeModel: null, allowedModels: [] };
   }
 
   async getSystemTools() {
@@ -936,11 +1032,35 @@ class AgentApiClient {
     throw new Error(errMsg);
   }
 
-  async sendChatMessage(message, conversationId, model, projectId) {
+  async getSkills() {
+    const res = await fetch(`${this.baseUrl}/api/skills`, {
+      headers: this.getHeaders(), signal: AbortSignal.timeout(5000)
+    });
+    if (!res.ok) throw new Error(`Không thể tải skill (HTTP ${res.status})`);
+    return await res.json();
+  }
+
+  async getConversationReviews(conversationId, {signal} = {}) {
+    const res = await fetch(`${this.baseUrl}/api/chat/conversations/${conversationId}/reviews`, {headers: this.getHeaders(), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(6000)]) : AbortSignal.timeout(6000)});
+    if (res.ok) return await res.json();
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Không thể tải review (HTTP ${res.status})`);
+  }
+
+  async createConversationReview(conversationId, request) {
+    const res = await fetch(`${this.baseUrl}/api/chat/conversations/${conversationId}/reviews`, {
+      method: 'POST', headers: this.getHeaders(), body: JSON.stringify(request), signal: AbortSignal.timeout(10000)
+    });
+    if (res.ok) return await res.json();
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Không thể tạo review (HTTP ${res.status})`);
+  }
+
+  async sendChatMessage(message, conversationId, model, projectId, reviewTaskId) {
     const res = await fetch(`${this.baseUrl}/api/chat`, {
       method: "POST",
       headers: this.getHeaders(),
-      body: JSON.stringify({ message, conversationId, model, projectId }),
+      body: JSON.stringify({ message, conversationId, model, projectId, reviewTaskId }),
       signal: AbortSignal.timeout(60000) // 60s cho LLM + Tool calling trên codebase
     });
     if (res.ok) return await res.json();

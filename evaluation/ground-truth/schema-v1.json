@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Ground truth v1 (selected by manifest groundTruthSchemaVersion=1)",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "defectId",
+      "fixtureId",
+      "sourceRevision",
+      "family",
+      "category",
+      "severity",
+      "classification",
+      "locations",
+      "rootCause",
+      "triggerCondition",
+      "expectedImpact",
+      "counterevidence",
+      "verificationProcedure",
+      "rationale"
+    ],
+    "properties": {
+      "defectId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "fixtureId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "sourceRevision": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "family": {
+        "type": "string",
+        "minLength": 1
+      },
+      "category": {
+        "enum": [
+          "SECURITY",
+          "BUG",
+          "PERFORMANCE",
+          "CODE_QUALITY",
+          "ARCHITECTURE"
+        ]
+      },
+      "severity": {
+        "enum": [
+          "CRITICAL",
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ]
+      },
+      "classification": {
+        "enum": [
+          "CONFIRMED_BUG",
+          "POTENTIAL_RISK",
+          "NON_BUG",
+          "SUBJECTIVE_IMPROVEMENT"
+        ]
+      },
+      "locations": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "filePath",
+            "lineStart",
+            "lineEnd",
+            "evidence"
+          ],
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lineStart": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "lineEnd": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "rootCause": {
+        "type": "string",
+        "minLength": 1
+      },
+      "triggerCondition": {
+        "type": "string",
+        "minLength": 1
+      },
+      "expectedImpact": {
+        "type": "string",
+        "minLength": 1
+      },
+      "counterevidence": {
+        "type": "string",
+        "minLength": 1
+      },
+      "verificationProcedure": {
+        "type": "string",
+        "minLength": 1
+      },
+      "rationale": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

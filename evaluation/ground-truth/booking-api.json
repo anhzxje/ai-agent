@@ -1,0 +1,94 @@
+[
+  {
+    "defectId": "booking-api-01",
+    "fixtureId": "booking-api",
+    "sourceRevision": "8016c5e823edb896534482780b492e3ca73dc411098e3abf69fe976bfde74cbe",
+    "family": "boundary-error",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/booking/BookingController.java",
+        "lineStart": 12,
+        "lineEnd": 12,
+        "evidence": "if (position < 0 || position > store.size()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);"
+      }
+    ],
+    "rootCause": "Index equal to collection size passes the range check.",
+    "triggerCondition": "GET position equal to the current booking count.",
+    "expectedImpact": "IndexOutOfBoundsException instead of a controlled bad request.",
+    "counterevidence": "Negative positions are checked, but upper bound uses > instead of >=.",
+    "verificationProcedure": "Call at(store.size()); expect validation rejection rather than list.get(size).",
+    "rationale": "Index equal to collection size passes the range check. Negative positions are checked, but upper bound uses > instead of >=."
+  },
+  {
+    "defectId": "booking-api-02",
+    "fixtureId": "booking-api",
+    "sourceRevision": "8016c5e823edb896534482780b492e3ca73dc411098e3abf69fe976bfde74cbe",
+    "family": "incorrect-state-transition",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/booking/BookingStore.java",
+        "lineStart": 15,
+        "lineEnd": 15,
+        "evidence": "states.put(number, \"CONFIRMED\");"
+      }
+    ],
+    "rootCause": "Cancellation writes CONFIRMED instead of CANCELLED.",
+    "triggerCondition": "Cancel existing confirmed booking 100.",
+    "expectedImpact": "Cancellation is acknowledged while booking remains confirmed.",
+    "counterevidence": "Unknown booking check exists but does not correct the transition.",
+    "verificationProcedure": "Call cancel(100) and verify resulting state should be CANCELLED; current result is CONFIRMED.",
+    "rationale": "Cancellation writes CONFIRMED instead of CANCELLED. Unknown booking check exists but does not correct the transition."
+  },
+  {
+    "defectId": "booking-api-03",
+    "fixtureId": "booking-api",
+    "sourceRevision": "8016c5e823edb896534482780b492e3ca73dc411098e3abf69fe976bfde74cbe",
+    "family": "idor",
+    "category": "SECURITY",
+    "severity": "HIGH",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/booking/BookingController.java",
+        "lineStart": 16,
+        "lineEnd": 16,
+        "evidence": "Object receipt(@PathVariable long number, Principal caller) { return store.receipt(number); }"
+      }
+    ],
+    "rootCause": "Receipt lookup does not bind the receipt to the authenticated caller.",
+    "triggerCondition": "Authenticated bob requests receipt 100 owned by alice.",
+    "expectedImpact": "Cross-user receipt disclosure.",
+    "counterevidence": "BookingStore provides owner data but controller does not enforce it.",
+    "verificationProcedure": "Invoke receipt(100,bob principal) and assert access is denied; current implementation returns alice receipt.",
+    "rationale": "Receipt lookup does not bind the receipt to the authenticated caller. BookingStore provides owner data but controller does not enforce it."
+  },
+  {
+    "defectId": "booking-api-04",
+    "fixtureId": "booking-api",
+    "sourceRevision": "8016c5e823edb896534482780b492e3ca73dc411098e3abf69fe976bfde74cbe",
+    "family": "missing-cleanup",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/booking/BookingStore.java",
+        "lineStart": 20,
+        "lineEnd": 20,
+        "evidence": "int count = Integer.parseInt(supplied);"
+      }
+    ],
+    "rootCause": "Writer cleanup is skipped when count parsing throws.",
+    "triggerCondition": "Call importCount with a nonnumeric value after writer creation.",
+    "expectedImpact": "Open writer and partially altered file remain on the exceptional path.",
+    "counterevidence": "Manual close exists only after parsing and write succeed.",
+    "verificationProcedure": "On a disposable data directory invoke nonnumeric input and verify writer closure on the failure path.",
+    "rationale": "Writer cleanup is skipped when count parsing throws. Manual close exists only after parsing and write succeed."
+  }
+]

@@ -14,7 +14,7 @@
     view: "welcome", // "welcome" | "chat" | "workspace"
     projects: [],
     tasks: [],
-    pinnedTasks: [],
+    get pinnedTasks() { return this.tasks.filter(task => task.isPinned === true); },
     conversations: [],
     activeConversationId: null,
     activeConversation: null,
@@ -23,7 +23,7 @@
     activeTask: null,
     activeTab: "findings",
     currentUser: window.apiClient ? window.apiClient.getCurrentUser() : null,
-    theme: localStorage.getItem("ai_agent_theme") || "light",
+    theme: localStorage.getItem("ai_agent_theme") || "dark",
     expandedProjectIds: new Set()
   };
 

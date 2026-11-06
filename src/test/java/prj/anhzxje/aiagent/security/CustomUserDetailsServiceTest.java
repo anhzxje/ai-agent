@@ -7,9 +7,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import prj.anhzxje.aiagent.entity.User;
-import prj.anhzxje.aiagent.enums.Role;
-import prj.anhzxje.aiagent.repository.UserRepository;
+import prj.anhzxje.aiagent.infrastructure.persistence.entity.User;
+import prj.anhzxje.aiagent.shared.enums.Role;
+import prj.anhzxje.aiagent.infrastructure.persistence.repository.UserRepository;
 
 import java.util.Optional;
 

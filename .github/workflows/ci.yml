@@ -43,6 +43,11 @@ jobs:
       - name: Run backend tests and package application
         run: ./mvnw --batch-mode --no-transfer-progress verify
 
+      - name: Check feature boundaries and compiled dependencies
+        run: |
+          python3 -m unittest discover -s src/test/python -p 'test_*.py'
+          python3 scripts/check-architecture.py --bytecode target/classes
+
       - name: Upload test and coverage reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -70,6 +75,23 @@ jobs:
 
       - name: Run all frontend tests
         run: node --test
+
+      - name: Run offline browser regression
+        env:
+          UI_SCREENSHOTS: ${{ runner.temp }}/aiagent-browser
+        run: |
+          export CHROMIUM_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROMIUM_PATH" || { echo 'Chromium browser is required' >&2; exit 1; }
+          node src/test/js/workspace.browser.cjs
+
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-browser-screenshots
+          path: ${{ runner.temp }}/aiagent-browser/
+          if-no-files-found: warn
+          retention-days: 7
 
   configuration-validation:
     name: Configuration validation

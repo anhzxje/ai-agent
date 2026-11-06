@@ -1,0 +1,232 @@
+[
+  {
+    "defectId": "inventory-api-01",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "sql-injection",
+    "category": "SECURITY",
+    "severity": "HIGH",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryStore.java",
+        "lineStart": 11,
+        "lineEnd": 11,
+        "evidence": "Object search(String name) { return jdbc.queryForList(\"SELECT id FROM accounts WHERE name = '\" + name + \"'\"); }"
+      }
+    ],
+    "rootCause": "Untrusted name is concatenated into SQL before execution.",
+    "triggerCondition": "Authenticated HTTP search with name containing a quote and OR predicate.",
+    "expectedImpact": "Query structure changes and discloses unrelated accounts.",
+    "counterevidence": "No parameter binding in search; binding in account() does not protect this method.",
+    "verificationProcedure": "Invoke search with a quote/OR value against a disposable seeded database and compare returned IDs.",
+    "rationale": "Untrusted name is concatenated into SQL before execution. No parameter binding in search; binding in account() does not protect this method."
+  },
+  {
+    "defectId": "inventory-api-02",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "idor",
+    "category": "SECURITY",
+    "severity": "HIGH",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryController.java",
+        "lineStart": 12,
+        "lineEnd": 12,
+        "evidence": "Object account(@PathVariable long id, Principal principal) { return store.account(id); }"
+      }
+    ],
+    "rootCause": "Account lookup ignores the authenticated principal and account owner.",
+    "triggerCondition": "User A requests the ID of an account owned by user B.",
+    "expectedImpact": "Disclosure of another user account.",
+    "counterevidence": "Authentication in AccessConfiguration does not enforce object ownership.",
+    "verificationProcedure": "Seed two owners, authenticate A, request B ID; expect rejection, current code returns B.",
+    "rationale": "Account lookup ignores the authenticated principal and account owner. Authentication in AccessConfiguration does not enforce object ownership."
+  },
+  {
+    "defectId": "inventory-api-03",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "unsafe-file-access",
+    "category": "SECURITY",
+    "severity": "HIGH",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryController.java",
+        "lineStart": 14,
+        "lineEnd": 14,
+        "evidence": "byte[] document(@RequestParam String path) throws Exception { return Files.readAllBytes(Path.of(path)); }"
+      }
+    ],
+    "rootCause": "HTTP path is used for file access without an allowed-root boundary.",
+    "triggerCondition": "Authenticated client supplies a readable path outside the document directory.",
+    "expectedImpact": "Read files available to the process outside intended scope.",
+    "counterevidence": "No normalize/real-path or ownership check exists on this flow.",
+    "verificationProcedure": "Use a harmless temporary file outside a configured documents directory; request its path.",
+    "rationale": "HTTP path is used for file access without an allowed-root boundary. No normalize/real-path or ownership check exists on this flow."
+  },
+  {
+    "defectId": "inventory-api-04",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "sensitive-data-exposure",
+    "category": "SECURITY",
+    "severity": "HIGH",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryController.java",
+        "lineStart": 16,
+        "lineEnd": 16,
+        "evidence": "Profile profile(Principal principal) { return new Profile(principal.getName(), store.passwordHash(principal.getName())); }"
+      }
+    ],
+    "rootCause": "Profile response serializes the stored password hash.",
+    "triggerCondition": "Authenticated client requests /profile for an account with a stored hash.",
+    "expectedImpact": "Offline guessing becomes possible after disclosure of the hash.",
+    "counterevidence": "The value is a hash, not plaintext, but must still not be returned.",
+    "verificationProcedure": "Stub passwordHash with a fictional sentinel and assert JSON contains passwordHash; do not use real credentials.",
+    "rationale": "Profile response serializes the stored password hash. The value is a hash, not plaintext, but must still not be returned."
+  },
+  {
+    "defectId": "inventory-api-05",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "wrong-condition",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryController.java",
+        "lineStart": 19,
+        "lineEnd": 19,
+        "evidence": "boolean available(@RequestParam int requested, @RequestParam int stock) { return requested >= stock; }"
+      }
+    ],
+    "rootCause": "Stock availability compares requested quantity in the wrong direction.",
+    "triggerCondition": "requested=2, stock=5 should be available; requested=6 should not.",
+    "expectedImpact": "Accepting unavailable stock and rejecting valid stock checks.",
+    "counterevidence": "Contract requires positive request and nonnegative stock; equality is valid.",
+    "verificationProcedure": "Call available(2,5) and available(6,5), expect true and false respectively.",
+    "rationale": "Stock availability compares requested quantity in the wrong direction. Contract requires positive request and nonnegative stock; equality is valid."
+  },
+  {
+    "defectId": "inventory-api-06",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "null-handling",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryController.java",
+        "lineStart": 21,
+        "lineEnd": 21,
+        "evidence": "String label(@RequestParam(required=false) String value) { return value.trim(); }"
+      }
+    ],
+    "rootCause": "Optional request value is dereferenced without a null check.",
+    "triggerCondition": "Omit optional value in /stock/label request.",
+    "expectedImpact": "NullPointerException instead of a controlled response.",
+    "counterevidence": "RequestParam is explicitly required=false.",
+    "verificationProcedure": "Invoke label(null), observe NullPointerException; add a defined missing-value response.",
+    "rationale": "Optional request value is dereferenced without a null check. RequestParam is explicitly required=false."
+  },
+  {
+    "defectId": "inventory-api-07",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "n-plus-one",
+    "category": "PERFORMANCE",
+    "severity": "MEDIUM",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryStore.java",
+        "lineStart": 16,
+        "lineEnd": 16,
+        "evidence": "for (long id : ids) results.add(account(id));"
+      }
+    ],
+    "rootCause": "Bulk account loading performs one database query per ID.",
+    "triggerCondition": "accounts receives a large list of existing account IDs.",
+    "expectedImpact": "Database round trips grow linearly instead of one bounded bulk query.",
+    "counterevidence": "This is an explicit JDBC query loop, not an inferred Hibernate association.",
+    "verificationProcedure": "Use a counting JDBC stub for 100 IDs; observe 100 queries, compare a parameterized bulk query.",
+    "rationale": "Bulk account loading performs one database query per ID. This is an explicit JDBC query loop, not an inferred Hibernate association."
+  },
+  {
+    "defectId": "inventory-api-08",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "repeated-operation",
+    "category": "PERFORMANCE",
+    "severity": "LOW",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryStore.java",
+        "lineStart": 21,
+        "lineEnd": 21,
+        "evidence": "for (String code : codes) if (Pattern.compile(\"[A-Z]{4}\").matcher(code).matches()) count++;"
+      }
+    ],
+    "rootCause": "An invariant regular expression is recompiled for every element.",
+    "triggerCondition": "validCodes processes a large batch in a hot request path.",
+    "expectedImpact": "Repeated regex parsing/allocation with no change in result.",
+    "counterevidence": "No catastrophic backtracking claim is made for this bounded pattern.",
+    "verificationProcedure": "Instrument compile invocations for a batch and compare with one cached immutable Pattern.",
+    "rationale": "An invariant regular expression is recompiled for every element. No catastrophic backtracking claim is made for this bounded pattern."
+  },
+  {
+    "defectId": "inventory-api-09",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "collection-processing",
+    "category": "PERFORMANCE",
+    "severity": "MEDIUM",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryStore.java",
+        "lineStart": 26,
+        "lineEnd": 26,
+        "evidence": "for (Long id : ids) if (!result.contains(id)) result.add(id);"
+      }
+    ],
+    "rootCause": "Deduplication repeatedly scans a growing ArrayList.",
+    "triggerCondition": "Large batch of distinct IDs, preserving insertion order is required.",
+    "expectedImpact": "Quadratic comparisons on the batch path.",
+    "counterevidence": "LinkedHashSet preserves order and supports the same required deduplication semantics.",
+    "verificationProcedure": "Count equality comparisons on increasing distinct batches; compare LinkedHashSet.",
+    "rationale": "Deduplication repeatedly scans a growing ArrayList. LinkedHashSet preserves order and supports the same required deduplication semantics."
+  },
+  {
+    "defectId": "inventory-api-10",
+    "fixtureId": "inventory-api",
+    "sourceRevision": "604e2509737964c5e658ba3989e0c059f365b6c9469d4d1f2678b8d87c588d90",
+    "family": "resource-leak",
+    "category": "BUG",
+    "severity": "MEDIUM",
+    "classification": "CONFIRMED_BUG",
+    "locations": [
+      {
+        "filePath": "src/main/java/fixture/inventory/InventoryStore.java",
+        "lineStart": 29,
+        "lineEnd": 29,
+        "evidence": "long countRows() throws Exception { return Files.lines(Path.of(\"data/items.txt\")).count(); }"
+      }
+    ],
+    "rootCause": "Files.lines stream is not closed after the terminal operation.",
+    "triggerCondition": "Repeatedly count an existing readable data/items.txt.",
+    "expectedImpact": "Open descriptors remain until nondeterministic cleanup.",
+    "counterevidence": "A terminal count operation does not close a Files.lines stream.",
+    "verificationProcedure": "Run repeatedly on a disposable directory and inspect descriptor growth; try-with-resources closes deterministically.",
+    "rationale": "Files.lines stream is not closed after the terminal operation. A terminal count operation does not close a Files.lines stream."
+  }
+]

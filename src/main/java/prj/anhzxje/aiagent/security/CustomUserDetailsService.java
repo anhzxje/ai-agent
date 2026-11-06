@@ -5,8 +5,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import prj.anhzxje.aiagent.entity.User;
-import prj.anhzxje.aiagent.repository.UserRepository;
+import prj.anhzxje.aiagent.infrastructure.persistence.entity.User;
+import prj.anhzxje.aiagent.infrastructure.persistence.repository.UserRepository;
 
 /**
  * Service nạp thông tin người dùng từ CSDL MySQL cho Spring Security.

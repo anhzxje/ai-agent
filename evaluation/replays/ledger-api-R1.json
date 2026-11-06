@@ -1,0 +1,25 @@
+{
+  "status": "COMPLETED",
+  "rawOutput": "{\"schemaVersion\": 2, \"summary\": \"Synthetic evaluator fixture; not a model result.\", \"issues\": [{\"classification\": \"CONFIRMED_BUG\", \"severity\": \"HIGH\", \"category\": \"BUG\", \"filePath\": \"src/main/java/fixture/ledger/Ledger.java\", \"lineStart\": 10, \"lineEnd\": 10, \"evidence\": \"synchronized boolean debit(long amount) {\", \"explanation\": \"All balance reads and updates use the same object monitor.\", \"suggestion\": \"Apply the correction described in the annotation verification contract.\"}], \"suggestions\": [], \"limitations\": [\"Synthetic report for scoring tests only.\"]}",
+  "observations": [
+    {
+      "filePath": "src/main/java/fixture/ledger/Ledger.java",
+      "lineStart": 1,
+      "lineEnd": 16
+    },
+    {
+      "filePath": "src/main/java/fixture/ledger/LedgerController.java",
+      "lineStart": 1,
+      "lineEnd": 15
+    },
+    {
+      "filePath": "src/main/java/fixture/ledger/AccessConfiguration.java",
+      "lineStart": 1,
+      "lineEnd": 10
+    }
+  ],
+  "usage": null,
+  "generationLatencyMs": null,
+  "errorCode": null,
+  "provenance": "SYNTHETIC_FIXTURE"
+}
